@@ -9,6 +9,7 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const { setAuth, user } = useAuthStore()
   const [isSetup, setIsSetup] = useState(false)
+  const [manualMode, setManualMode] = useState<'login' | 'register' | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: '' })
@@ -21,12 +22,15 @@ export default function LoginPage() {
     }).catch(() => setLoading(false))
   }, [])
 
+  // Effective mode: manual override takes precedence over auto-detected
+  const showRegister = manualMode === 'register' || (manualMode === null && isSetup)
+
   const handle = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
     try {
       let res
-      if (isSetup) {
+      if (showRegister) {
         res = await authApi.register(form.email, form.password, form.name)
         toast.success('Account created!')
       } else {
@@ -56,23 +60,23 @@ export default function LoginPage() {
         {/* Logo area */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-brand-600/20 border border-brand-600/30 flex items-center justify-center mx-auto mb-4">
-            <span className="text-3xl">🥻</span>
+            <span className="text-3xl">🏡</span>
           </div>
-          <h1 className="font-display text-3xl font-bold text-white">Pleat Perfect</h1>
+          <h1 className="font-display text-3xl font-bold text-white">HomeCraft</h1>
           <p className="text-gray-400 text-sm mt-1">Business Manager</p>
         </div>
 
         {/* Card */}
         <div className="card">
           <h2 className="font-display text-xl font-semibold text-white mb-1">
-            {isSetup ? 'Create your account' : 'Welcome back'}
+            {showRegister ? 'Create your account' : 'Welcome back'}
           </h2>
           <p className="text-gray-500 text-sm mb-5">
-            {isSetup ? 'Set up your Pleat Perfect account' : 'Sign in to manage your business'}
+            {showRegister ? 'Set up your HomeCraft account' : 'Sign in to manage your business'}
           </p>
 
           <form onSubmit={handle} className="space-y-4">
-            {isSetup && (
+            {showRegister && (
               <div>
                 <label className="label">Your Name</label>
                 <input
@@ -109,9 +113,25 @@ export default function LoginPage() {
             </div>
             <button type="submit" disabled={submitting} className="btn-primary w-full flex items-center justify-center gap-2 mt-2">
               {submitting && <Loader2 size={16} className="animate-spin" />}
-              {isSetup ? 'Create Account' : 'Sign In'}
+              {showRegister ? 'Create Account' : 'Sign In'}
             </button>
           </form>
+
+          <p className="text-center text-xs text-gray-600 mt-4">
+            {showRegister ? (
+              <>Already have an account?{' '}
+                <button onClick={() => setManualMode('login')} className="text-brand-400 hover:text-brand-300">
+                  Sign in
+                </button>
+              </>
+            ) : (
+              <>Don't have an account?{' '}
+                <button onClick={() => setManualMode('register')} className="text-brand-400 hover:text-brand-300">
+                  Create one
+                </button>
+              </>
+            )}
+          </p>
         </div>
       </div>
     </div>

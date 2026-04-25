@@ -5,7 +5,7 @@ import { EarningsService } from './earnings.service';
 @Controller('earnings')
 @UseGuards(JwtAuthGuard)
 export class EarningsController {
-  constructor(private service: EarningsService) {}
+  constructor(private readonly service: EarningsService) {}
 
   @Get('summary')
   getSummary() {
@@ -13,12 +13,28 @@ export class EarningsController {
   }
 
   @Get('monthly')
-  getMonthly(@Query('year') year?: number) {
-    return this.service.getMonthly(year ? parseInt(year as any) : undefined);
+  getMonthly(@Query('year') year?: string) {
+    return this.service.getMonthly(year ? parseInt(year) : undefined);
   }
 
-  @Get('by-type')
-  getByType() {
-    return this.service.getByType();
+  /** Revenue split: Products vs Services */
+  @Get('by-business-line')
+  getByBusinessLine() {
+    return this.service.getByBusinessLine();
+  }
+
+  @Get('top-products')
+  getTopProducts(@Query('limit') limit?: string) {
+    return this.service.getTopProducts(limit ? parseInt(limit) : 5);
+  }
+
+  @Get('top-services')
+  getTopServices(@Query('limit') limit?: string) {
+    return this.service.getTopServices(limit ? parseInt(limit) : 5);
+  }
+
+  @Get('customer-ltv')
+  getCustomerLTV(@Query('limit') limit?: string) {
+    return this.service.getCustomerLTV(limit ? parseInt(limit) : 10);
   }
 }

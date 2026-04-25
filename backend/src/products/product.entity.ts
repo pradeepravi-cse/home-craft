@@ -1,19 +1,14 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
-  CreateDateColumn, UpdateDateColumn
+  CreateDateColumn, UpdateDateColumn,
 } from 'typeorm';
 
 export enum ProductCategory {
-  COOKIES = 'cookies',
-  CAKES = 'cakes',
-  BROWNIES = 'brownies',
-  PUFFS = 'puffs',
-  OTHER = 'other',
-}
-
-export enum BusinessLine {
-  SAREE = 'saree',
-  BAKING = 'baking',
+  COOKIES = 'COOKIES',
+  CAKES = 'CAKES',
+  BROWNIES = 'BROWNIES',
+  PUFFS = 'PUFFS',
+  OTHER = 'OTHER',
 }
 
 @Entity('products')
@@ -27,29 +22,27 @@ export class Product {
   @Column({ nullable: true })
   description: string;
 
-  @Column({ type: 'enum', enum: BusinessLine, default: BusinessLine.BAKING })
-  businessLine: BusinessLine;
-
-  @Column({ type: 'enum', enum: ProductCategory, nullable: true })
+  @Column({ type: 'enum', enum: ProductCategory, default: ProductCategory.OTHER })
   category: ProductCategory;
 
-  @Column({ type: 'decimal', precision: 8, scale: 2 })
+  @Column({ type: 'numeric', precision: 10, scale: 2 })
   price: number;
 
-  @Column({ type: 'decimal', precision: 8, scale: 2, default: 0 })
+  @Column({ type: 'numeric', precision: 10, scale: 2, nullable: true })
   costPrice: number;
 
   @Column({ default: true })
   isActive: boolean;
 
   @Column({ default: true })
-  isPublic: boolean; // visible on public API
+  isPublic: boolean;
 
   @Column({ nullable: true })
   imageUrl: string;
 
+  /** e.g. "per piece", "per dozen", "per box" */
   @Column({ nullable: true })
-  unit: string; // e.g. "per piece", "per dozen", "per box"
+  unit: string;
 
   @CreateDateColumn()
   createdAt: Date;

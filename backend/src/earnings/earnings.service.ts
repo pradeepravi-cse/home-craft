@@ -1,82 +1,190 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Order, OrderStatus } from '../orders/order.entity';
+import { OrderItem, OrderItemType } from '../orders/order-item.entity';
 
 @Injectable()
 export class EarningsService {
   constructor(
+    @InjectPinoLogger(EarningsService.name)
+    private readonly logger: PinoLogger,
     @InjectRepository(Order)
-    private orderRepo: Repository<Order>,
+    private ordersRepo: Repository<Order>,
+    @InjectRepository(OrderItem)
+    private itemsRepo: Repository<OrderItem>,
   ) {}
 
   async getMonthly(year?: number): Promise<any[]> {
     const y = year || new Date().getFullYear();
-    const rows = await this.orderRepo.query(`
+    this.logger.debug({ year: y }, 'earnings:getMonthly');
+
+    const rows = await this.ordersRepo.query(
+      `
       SELECT
-        EXTRACT(MONTH FROM "createdAt") as month,
-        SUM("priceCharged") as revenue,
-        SUM("totalExpenses") as expenses,
-        COUNT(*) as order_count
+        EXTRACT(MONTH FROM "createdAt") AS month,
+        COALESCE(SUM(CAST("totalAmount" AS numeric)), 0) AS revenue,
+        COALESCE(SUM(CAST("totalExpenses" AS numeric)), 0) AS expenses,
+        COUNT(*) AS order_count
       FROM orders
       WHERE EXTRACT(YEAR FROM "createdAt") = $1
+        AND status = $2
       GROUP BY EXTRACT(MONTH FROM "createdAt")
       ORDER BY month
-    `, [y]);
+      `,
+      [y, OrderStatus.COMPLETED],
+    );
 
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return months.map((name, i) => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const result = months.map((name, i) => {
       const row = rows.find((r: any) => parseInt(r.month) === i + 1);
+      const revenue = row ? parseFloat(row.revenue) : 0;
+      const expenses = row ? parseFloat(row.expenses) : 0;
       return {
         month: name,
-        revenue: row ? parseFloat(row.revenue) : 0,
-        expenses: row ? parseFloat(row.expenses) : 0,
-        profit: row ? parseFloat(row.revenue) - parseFloat(row.expenses) : 0,
+        revenue,
+        expenses,
+        profit: revenue - expenses,
         orderCount: row ? parseInt(row.order_count) : 0,
       };
     });
+    this.logger.debug({ year: y, months: result.filter((m) => m.orderCount > 0).length }, 'earnings:getMonthly result');
+    return result;
   }
 
   async getSummary(): Promise<any> {
-    const [result] = await this.orderRepo.query(`
+    this.logger.debug('earnings:getSummary');
+    const [totals] = await this.ordersRepo.query(`
       SELECT
-        SUM("priceCharged") as total_revenue,
-        SUM("totalExpenses") as total_expenses,
-        COUNT(*) as total_orders
+        COALESCE(SUM(CAST("totalAmount" AS numeric)), 0) AS total_revenue,
+        COALESCE(SUM(CAST("totalExpenses" AS numeric)), 0) AS total_expenses,
+        COUNT(*) AS total_orders
       FROM orders
+      WHERE status = '${OrderStatus.COMPLETED}'
     `);
-    const thisMonth = await this.orderRepo.query(`
+
+    const [thisMonth] = await this.ordersRepo.query(`
       SELECT
-        SUM("priceCharged") as revenue,
-        SUM("totalExpenses") as expenses,
-        COUNT(*) as order_count
+        COALESCE(SUM(CAST("totalAmount" AS numeric)), 0) AS revenue,
+        COALESCE(SUM(CAST("totalExpenses" AS numeric)), 0) AS expenses,
+        COUNT(*) AS order_count
       FROM orders
-      WHERE DATE_TRUNC('month', "createdAt") = DATE_TRUNC('month', CURRENT_DATE)
+      WHERE status = '${OrderStatus.COMPLETED}'
+        AND DATE_TRUNC('month', "createdAt") = DATE_TRUNC('month', CURRENT_DATE)
     `);
-    const m = thisMonth[0];
-    return {
-      totalRevenue: parseFloat(result.total_revenue) || 0,
-      totalExpenses: parseFloat(result.total_expenses) || 0,
-      netProfit: (parseFloat(result.total_revenue) || 0) - (parseFloat(result.total_expenses) || 0),
-      totalOrders: parseInt(result.total_orders) || 0,
+
+    const totalRevenue = parseFloat(totals.total_revenue);
+    const totalExpenses = parseFloat(totals.total_expenses);
+    const monthRevenue = parseFloat(thisMonth.revenue);
+    const monthExpenses = parseFloat(thisMonth.expenses);
+
+    const summary = {
+      totalRevenue,
+      totalExpenses,
+      netProfit: totalRevenue - totalExpenses,
+      totalOrders: parseInt(totals.total_orders),
       thisMonth: {
-        revenue: parseFloat(m.revenue) || 0,
-        expenses: parseFloat(m.expenses) || 0,
-        profit: (parseFloat(m.revenue) || 0) - (parseFloat(m.expenses) || 0),
-        orderCount: parseInt(m.order_count) || 0,
+        revenue: monthRevenue,
+        expenses: monthExpenses,
+        profit: monthRevenue - monthExpenses,
+        orderCount: parseInt(thisMonth.order_count),
+      },
+    };
+    this.logger.debug({ totalRevenue, netProfit: summary.netProfit }, 'earnings:getSummary result');
+    return summary;
+  }
+
+  async getByBusinessLine(): Promise<any> {
+    this.logger.debug('earnings:getByBusinessLine');
+    const rows = await this.itemsRepo.query(`
+      SELECT
+        oi.type,
+        COALESCE(SUM(CAST(oi.subtotal AS numeric)), 0) AS revenue,
+        COUNT(DISTINCT oi.order_id) AS order_count
+      FROM order_items oi
+      INNER JOIN orders o ON o.id = oi.order_id
+      WHERE o.status = '${OrderStatus.COMPLETED}'
+      GROUP BY oi.type
+    `);
+
+    const productRow = rows.find((r: any) => r.type === OrderItemType.PRODUCT);
+    const serviceRow = rows.find((r: any) => r.type === OrderItemType.SERVICE);
+
+    return {
+      products: {
+        revenue: productRow ? parseFloat(productRow.revenue) : 0,
+        orderCount: productRow ? parseInt(productRow.order_count) : 0,
+      },
+      services: {
+        revenue: serviceRow ? parseFloat(serviceRow.revenue) : 0,
+        orderCount: serviceRow ? parseInt(serviceRow.order_count) : 0,
       },
     };
   }
 
-  async getByType(): Promise<any[]> {
-    return this.orderRepo.query(`
+  async getTopProducts(limit = 5): Promise<any[]> {
+    this.logger.debug({ limit }, 'earnings:getTopProducts');
+    return this.itemsRepo.query(
+      `
       SELECT
-        type,
-        COUNT(*) as count,
-        SUM("priceCharged") as revenue,
-        SUM("totalExpenses") as expenses
-      FROM orders
-      GROUP BY type
-    `);
+        oi.reference_id AS "productId",
+        oi.name,
+        COALESCE(SUM(CAST(oi.subtotal AS numeric)), 0) AS revenue,
+        SUM(oi.quantity) AS units_sold
+      FROM order_items oi
+      INNER JOIN orders o ON o.id = oi.order_id
+      WHERE oi.type = '${OrderItemType.PRODUCT}'
+        AND o.status = '${OrderStatus.COMPLETED}'
+      GROUP BY oi.reference_id, oi.name
+      ORDER BY revenue DESC
+      LIMIT $1
+      `,
+      [limit],
+    );
+  }
+
+  async getTopServices(limit = 5): Promise<any[]> {
+    this.logger.debug({ limit }, 'earnings:getTopServices');
+    return this.itemsRepo.query(
+      `
+      SELECT
+        oi.reference_id AS "serviceId",
+        oi.name,
+        COALESCE(SUM(CAST(oi.subtotal AS numeric)), 0) AS revenue,
+        SUM(oi.quantity) AS count
+      FROM order_items oi
+      INNER JOIN orders o ON o.id = oi.order_id
+      WHERE oi.type = '${OrderItemType.SERVICE}'
+        AND o.status = '${OrderStatus.COMPLETED}'
+      GROUP BY oi.reference_id, oi.name
+      ORDER BY revenue DESC
+      LIMIT $1
+      `,
+      [limit],
+    );
+  }
+
+  async getCustomerLTV(limit = 10): Promise<any[]> {
+    // Result contains customerName — that's PII returned to the caller.
+    // We do NOT log the result rows; we only log that the query ran.
+    this.logger.debug({ limit }, 'earnings:getCustomerLTV');
+    return this.ordersRepo.query(
+      `
+      SELECT
+        o.customer_id AS "customerId",
+        c.name AS "customerName",
+        COALESCE(SUM(CAST(o."totalAmount" AS numeric)), 0) AS total_spent,
+        COUNT(o.id) AS order_count
+      FROM orders o
+      INNER JOIN customers c ON c.id = o.customer_id
+      WHERE o.status = '${OrderStatus.COMPLETED}'
+      GROUP BY o.customer_id, c.name
+      ORDER BY total_spent DESC
+      LIMIT $1
+      `,
+      [limit],
+    );
   }
 }

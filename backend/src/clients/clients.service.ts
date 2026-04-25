@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Client } from './client.entity';
 import { IsString, IsOptional } from 'class-validator';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { Client } from './client.entity';
 
 export class CreateClientDto {
   @IsString()
@@ -50,12 +51,17 @@ export class UpdateClientDto {
 @Injectable()
 export class ClientsService {
   constructor(
+    @InjectPinoLogger(ClientsService.name)
+    private readonly logger: PinoLogger,
     @InjectRepository(Client)
     private clientsRepo: Repository<Client>,
   ) {}
 
   async findAll(search?: string): Promise<Client[]> {
-    const qb = this.clientsRepo.createQueryBuilder('client')
+    // Do not log the search string — it may be a name, phone, or handle (all PII)
+    this.logger.debug({ hasSearch: !!search }, 'clients:findAll');
+    const qb = this.clientsRepo
+      .createQueryBuilder('client')
       .leftJoinAndSelect('client.measurements', 'measurements')
       .orderBy('client.createdAt', 'DESC');
 
@@ -66,10 +72,13 @@ export class ClientsService {
       );
     }
 
-    return qb.getMany();
+    const results = await qb.getMany();
+    this.logger.debug({ count: results.length }, 'clients:findAll result');
+    return results;
   }
 
   async findOne(id: string): Promise<Client> {
+    this.logger.debug({ id }, 'clients:findOne');
     const client = await this.clientsRepo.findOne({
       where: { id },
       relations: ['measurements', 'orders', 'orders.expenses'],
@@ -79,19 +88,28 @@ export class ClientsService {
   }
 
   async create(dto: CreateClientDto): Promise<Client> {
+    // Log contactSource only — never name/phone/instagram/notes
+    this.logger.info({ contactSource: dto.contactSource }, 'clients:create');
     const client = this.clientsRepo.create(dto);
-    return this.clientsRepo.save(client);
+    const saved = await this.clientsRepo.save(client);
+    this.logger.info({ id: (saved as any).id }, 'clients:created');
+    return saved;
   }
 
   async update(id: string, dto: UpdateClientDto): Promise<Client> {
+    this.logger.info({ id }, 'clients:update');
     const client = await this.findOne(id);
     Object.assign(client, dto);
-    return this.clientsRepo.save(client);
+    const saved = await this.clientsRepo.save(client);
+    this.logger.info({ id: (saved as any).id }, 'clients:updated');
+    return saved;
   }
 
   async remove(id: string): Promise<void> {
+    this.logger.info({ id }, 'clients:remove');
     const client = await this.findOne(id);
     await this.clientsRepo.remove(client);
+    this.logger.info({ id }, 'clients:removed');
   }
 
   async count(): Promise<number> {

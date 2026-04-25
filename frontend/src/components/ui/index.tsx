@@ -15,7 +15,7 @@ export function StatCard({ label, value, sub, color = 'brand' }: {
   return (
     <div className={`bg-gradient-to-br ${colors[color] || colors.brand} border rounded-2xl p-4`}>
       <p className="text-xs text-gray-400 uppercase tracking-wide">{label}</p>
-      <p className="text-2xl font-display font-bold text-white mt-1">{value}</p>
+      <p className="text-xl font-display font-bold text-white mt-1 truncate">{value}</p>
       {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
     </div>
   )

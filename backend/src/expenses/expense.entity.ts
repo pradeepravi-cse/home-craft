@@ -1,17 +1,18 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
-  CreateDateColumn, ManyToOne, JoinColumn
+  CreateDateColumn, ManyToOne, JoinColumn,
 } from 'typeorm';
 import { Order } from '../orders/order.entity';
 
 export enum ExpenseCategory {
-  PACKING = 'packing',
-  SAFETY_PINS = 'safety_pins',
-  IRON = 'iron',
-  ELECTRICITY = 'electricity',
-  TRANSPORT = 'transport',
-  MATERIAL = 'material',
-  OTHER = 'other',
+  PACKING = 'PACKING',
+  SAFETY_PINS = 'SAFETY_PINS',
+  IRON = 'IRON',
+  ELECTRICITY = 'ELECTRICITY',
+  TRANSPORT = 'TRANSPORT',
+  MATERIAL = 'MATERIAL',
+  LABOR = 'LABOR',
+  OTHER = 'OTHER',
 }
 
 @Entity('expenses')
@@ -20,10 +21,10 @@ export class Expense {
   id: string;
 
   @ManyToOne(() => Order, (o) => o.expenses, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'orderId' })
+  @JoinColumn({ name: 'order_id' })
   order: Order;
 
-  @Column()
+  @Column({ name: 'order_id' })
   orderId: string;
 
   @Column({ type: 'enum', enum: ExpenseCategory, default: ExpenseCategory.OTHER })
@@ -32,7 +33,7 @@ export class Expense {
   @Column()
   description: string;
 
-  @Column({ type: 'decimal', precision: 8, scale: 2 })
+  @Column({ type: 'numeric', precision: 10, scale: 2 })
   amount: number;
 
   @CreateDateColumn()

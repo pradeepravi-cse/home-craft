@@ -1,13 +1,17 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { useAuthStore } from './store/auth'
+import { useThemeStore } from './store/theme'
 import AppLayout from './components/layout/AppLayout'
 import LoginPage from './pages/Login'
 import Dashboard from './pages/Dashboard'
-import { ClientsPage, ClientFormPage, ClientDetailPage } from './pages/Clients'
+import { CustomersPage, CustomerFormPage, CustomerDetailPage } from './pages/Customers'
 import { OrdersPage, NewOrderPage, OrderDetailPage } from './pages/Orders'
 import EarningsPage from './pages/Earnings'
 import ProductsPage from './pages/Products'
+import ServicesPage from './pages/Services'
+import RecipesPage from './pages/Recipes'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { token } = useAuthStore()
@@ -16,6 +20,17 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const { theme } = useThemeStore()
+
+  useEffect(() => {
+    const html = document.documentElement
+    if (theme === 'light') {
+      html.classList.add('light')
+    } else {
+      html.classList.remove('light')
+    }
+  }, [theme])
+
   return (
     <BrowserRouter>
       <Toaster
@@ -28,16 +43,32 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<RequireAuth><Dashboard /></RequireAuth>} />
-        <Route path="/clients" element={<RequireAuth><ClientsPage /></RequireAuth>} />
-        <Route path="/clients/new" element={<RequireAuth><ClientFormPage /></RequireAuth>} />
-        <Route path="/clients/:id" element={<RequireAuth><ClientDetailPage /></RequireAuth>} />
-        <Route path="/clients/:id/edit" element={<RequireAuth><ClientFormPage /></RequireAuth>} />
+
+        {/* Customers */}
+        <Route path="/customers" element={<RequireAuth><CustomersPage /></RequireAuth>} />
+        <Route path="/customers/new" element={<RequireAuth><CustomerFormPage /></RequireAuth>} />
+        <Route path="/customers/:id" element={<RequireAuth><CustomerDetailPage /></RequireAuth>} />
+        <Route path="/customers/:id/edit" element={<RequireAuth><CustomerFormPage /></RequireAuth>} />
+
+        {/* Orders */}
         <Route path="/orders" element={<RequireAuth><OrdersPage /></RequireAuth>} />
         <Route path="/orders/new" element={<RequireAuth><NewOrderPage /></RequireAuth>} />
         <Route path="/orders/:id" element={<RequireAuth><OrderDetailPage /></RequireAuth>} />
-        <Route path="/orders/:id/edit" element={<RequireAuth><NewOrderPage /></RequireAuth>} />
+
+        {/* Services */}
+        <Route path="/services" element={<RequireAuth><ServicesPage /></RequireAuth>} />
+
+        {/* Recipes & Costs */}
+        <Route path="/recipes" element={<RequireAuth><RecipesPage /></RequireAuth>} />
+
+        {/* Other */}
         <Route path="/earnings" element={<RequireAuth><EarningsPage /></RequireAuth>} />
         <Route path="/products" element={<RequireAuth><ProductsPage /></RequireAuth>} />
+
+        {/* Legacy redirects */}
+        <Route path="/clients" element={<Navigate to="/customers" replace />} />
+        <Route path="/clients/*" element={<Navigate to="/customers" replace />} />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

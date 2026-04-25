@@ -1,21 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { clientsApi, measurementsApi, ordersApi } from '../api/client'
+import { customersApi, measurementsApi, ordersApi } from '../api/client'
 import { PageHeader, Empty, Spinner, Badge, Modal, Field, ConfirmDialog } from '../components/ui'
-import { fmt, STATUS_COLORS, STATUS_LABELS, ORDER_TYPE_LABELS } from '../utils'
+import { fmt, STATUS_COLORS, STATUS_LABELS, CONTACT_SOURCE_LABELS } from '../utils'
 import toast from 'react-hot-toast'
 import { Plus, User, Phone, Instagram, Trash2, Edit2, Ruler, ShoppingBag, ChevronRight } from 'lucide-react'
 
-// ─── Client List ────────────────────────────────────────────────────────────
-export function ClientsPage() {
-  const [clients, setClients] = useState<any[]>([])
+// ─── Customer List ────────────────────────────────────────────────────────────
+export function CustomersPage() {
+  const [customers, setCustomers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
-  const load = (s = '') => clientsApi.list(s || undefined).then(setClients).finally(() => setLoading(false))
+  const load = (s = '') => customersApi.list(s || undefined).then(setCustomers).finally(() => setLoading(false))
 
   useEffect(() => { load() }, [])
-
   useEffect(() => {
     const t = setTimeout(() => load(search), 300)
     return () => clearTimeout(t)
@@ -26,10 +25,10 @@ export function ClientsPage() {
   return (
     <div>
       <PageHeader
-        title="Clients"
-        subtitle={`${clients.length} clients`}
+        title="Customers"
+        subtitle={`${customers.length} customers`}
         action={
-          <Link to="/clients/new" className="btn-primary flex items-center gap-1.5 text-sm">
+          <Link to="/customers/new" className="btn-primary flex items-center gap-1.5 text-sm">
             <Plus size={16} /> New
           </Link>
         }
@@ -42,12 +41,16 @@ export function ClientsPage() {
           onChange={e => setSearch(e.target.value)}
         />
       </div>
-      {clients.length === 0 ? (
-        <Empty icon={<User size={40} />} message="No clients yet" action={<Link to="/clients/new" className="btn-primary text-sm">Add first client</Link>} />
+      {customers.length === 0 ? (
+        <Empty
+          icon={<User size={40} />}
+          message="No customers yet"
+          action={<Link to="/customers/new" className="btn-primary text-sm">Add first customer</Link>}
+        />
       ) : (
         <div className="px-4 space-y-2">
-          {clients.map(c => (
-            <Link key={c.id} to={`/clients/${c.id}`} className="card flex items-center gap-3 hover:border-gray-700 transition-colors">
+          {customers.map(c => (
+            <Link key={c.id} to={`/customers/${c.id}`} className="card flex items-center gap-3 hover:border-gray-700 transition-colors">
               <div className="w-10 h-10 rounded-full bg-brand-900/40 border border-brand-800/50 flex items-center justify-center text-brand-300 font-display font-bold text-lg flex-shrink-0">
                 {c.name[0].toUpperCase()}
               </div>
@@ -67,47 +70,59 @@ export function ClientsPage() {
   )
 }
 
-// ─── New / Edit Client ───────────────────────────────────────────────────────
-export function ClientFormPage() {
+// ─── New / Edit Customer ──────────────────────────────────────────────────────
+export function CustomerFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const isEdit = Boolean(id)
-  const [form, setForm] = useState({ name: '', phone: '', instagram: '', contactSource: 'whatsapp', notes: '' })
+  const [form, setForm] = useState({
+    name: '', phone: '', email: '', instagram: '',
+    contactSource: 'whatsapp', notes: '',
+  })
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (isEdit) clientsApi.get(id!).then(c => setForm({
-      name: c.name, phone: c.phone || '', instagram: c.instagram || '',
-      contactSource: c.contactSource || 'whatsapp', notes: c.notes || ''
+    if (isEdit) customersApi.get(id!).then(c => setForm({
+      name: c.name, phone: c.phone || '', email: c.email || '',
+      instagram: c.instagram || '', contactSource: c.contactSource || 'whatsapp',
+      notes: c.notes || '',
     }))
   }, [id])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
+    // Strip empty optional fields so backend validators don't reject them
+    const payload: any = { ...form }
+    if (!payload.email) delete payload.email
+    if (!payload.instagram) delete payload.instagram
+    if (!payload.phone) delete payload.phone
+    if (!payload.notes) delete payload.notes
     try {
       if (isEdit) {
-        await clientsApi.update(id!, form)
-        toast.success('Client updated')
+        await customersApi.update(id!, payload)
+        toast.success('Customer updated')
+        navigate(-1)
       } else {
-        const c = await clientsApi.create(form)
-        toast.success('Client created')
-        navigate(`/clients/${c.id}`)
-        return
+        const c = await customersApi.create(payload)
+        toast.success('Customer created')
+        navigate(`/customers/${c.id}`)
       }
-      navigate(-1)
     } catch { toast.error('Failed to save') } finally { setSaving(false) }
   }
 
   return (
     <div>
-      <PageHeader title={isEdit ? 'Edit Client' : 'New Client'} />
+      <PageHeader title={isEdit ? 'Edit Customer' : 'New Customer'} />
       <form onSubmit={submit} className="px-4 space-y-4">
         <Field label="Full Name *">
-          <input className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Client's name" />
+          <input className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Customer's name" />
         </Field>
         <Field label="WhatsApp Number">
           <input className="input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+60xxxxxxxxx" />
+        </Field>
+        <Field label="Email">
+          <input type="email" className="input" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="email@example.com" />
         </Field>
         <Field label="Instagram Handle">
           <input className="input" value={form.instagram} onChange={e => setForm(f => ({ ...f, instagram: e.target.value }))} placeholder="@handle" />
@@ -117,48 +132,67 @@ export function ClientFormPage() {
             <option value="whatsapp">WhatsApp</option>
             <option value="instagram">Instagram</option>
             <option value="referral">Referral</option>
-            <option value="other">Other</option>
+            <option value="walk-in">Walk-in</option>
           </select>
         </Field>
         <Field label="Notes">
           <textarea className="input min-h-[80px]" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Any special notes…" />
         </Field>
-        <button type="submit" disabled={saving} className="btn-primary w-full">{saving ? 'Saving…' : 'Save Client'}</button>
+        <button type="submit" disabled={saving} className="btn-primary w-full">{saving ? 'Saving…' : 'Save Customer'}</button>
         <button type="button" onClick={() => navigate(-1)} className="btn-secondary w-full">Cancel</button>
       </form>
     </div>
   )
 }
 
-// ─── Client Detail ───────────────────────────────────────────────────────────
-export function ClientDetailPage() {
+// ─── Customer Detail ──────────────────────────────────────────────────────────
+export function CustomerDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [client, setClient] = useState<any>(null)
+  const [customer, setCustomer] = useState<any>(null)
   const [orders, setOrders] = useState<any[]>([])
   const [measurements, setMeasurements] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [mModal, setMModal] = useState(false)
-  const [mForm, setMForm] = useState({ palluLength: '', shoulderToNavel: '', waistToFloor: '', bodyWrap: '', unit: 'inches', label: '', notes: '' })
+  const [mForm, setMForm] = useState({
+    palluLength: '', shoulderToNavel: '', waistToFloor: '', bodyWrap: '',
+    unit: 'inches', label: '', notes: '',
+  })
   const [editMeasurement, setEditMeasurement] = useState<any>(null)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
 
   const load = async () => {
     const [c, o, m] = await Promise.all([
-      clientsApi.get(id!),
-      ordersApi.list({ clientId: id }),
-      measurementsApi.byClient(id!),
+      customersApi.get(id!),
+      ordersApi.list({ customerId: id }),
+      measurementsApi.byCustomer(id!),
     ])
-    setClient(c); setOrders(o); setMeasurements(m)
+    setCustomer(c); setOrders(o); setMeasurements(m)
     setLoading(false)
   }
 
   useEffect(() => { load() }, [id])
 
+  const openAddMeasurement = () => {
+    setEditMeasurement(null)
+    setMForm({ palluLength: '', shoulderToNavel: '', waistToFloor: '', bodyWrap: '', unit: 'inches', label: '', notes: '' })
+    setMModal(true)
+  }
+
+  const openEditMeasurement = (m: any) => {
+    setEditMeasurement(m)
+    setMForm({
+      palluLength: m.palluLength || '', shoulderToNavel: m.shoulderToNavel || '',
+      waistToFloor: m.waistToFloor || '', bodyWrap: m.bodyWrap || '',
+      unit: m.unit, label: m.label || '', notes: m.notes || '',
+    })
+    setMModal(true)
+  }
+
   const saveMeasurement = async () => {
     try {
       const data = {
-        clientId: id,
+        customerId: id,
         palluLength: parseFloat(mForm.palluLength) || null,
         shoulderToNavel: parseFloat(mForm.shoulderToNavel) || null,
         waistToFloor: parseFloat(mForm.waistToFloor) || null,
@@ -168,54 +202,76 @@ export function ClientDetailPage() {
       if (editMeasurement) await measurementsApi.update(editMeasurement.id, data)
       else await measurementsApi.create(data)
       toast.success('Measurements saved')
-      setMModal(false); setEditMeasurement(null)
-      setMForm({ palluLength: '', shoulderToNavel: '', waistToFloor: '', bodyWrap: '', unit: 'inches', label: '', notes: '' })
+      setMModal(false)
       load()
     } catch { toast.error('Failed to save') }
   }
 
-  const deleteClient = async () => {
-    await clientsApi.delete(id!)
-    toast.success('Client deleted')
-    navigate('/clients')
+  const deleteCustomer = async () => {
+    await customersApi.delete(id!)
+    toast.success('Customer deleted')
+    navigate('/customers')
   }
 
   if (loading) return <Spinner />
 
+  const totalSpent = orders
+    .filter(o => o.status === 'COMPLETED')
+    .reduce((sum, o) => sum + Number(o.totalAmount), 0)
+
   return (
     <div>
       <div className="px-4 pt-5 pb-3 flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-brand-900/40 border border-brand-800/50 flex items-center justify-center text-brand-300 font-display font-bold text-xl">
-              {client.name[0].toUpperCase()}
-            </div>
-            <div>
-              <h1 className="font-display text-xl font-bold text-white">{client.name}</h1>
-              <p className="text-xs text-gray-500 capitalize">{client.contactSource}</p>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-brand-900/40 border border-brand-800/50 flex items-center justify-center text-brand-300 font-display font-bold text-xl">
+            {customer.name[0].toUpperCase()}
+          </div>
+          <div>
+            <h1 className="font-display text-xl font-bold text-white">{customer.name}</h1>
+            <p className="text-xs text-gray-500">{CONTACT_SOURCE_LABELS[customer.contactSource] || customer.contactSource}</p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Link to={`/clients/${id}/edit`} className="btn-secondary p-2.5"><Edit2 size={16} /></Link>
+          <Link to={`/customers/${id}/edit`} className="btn-secondary p-2.5"><Edit2 size={16} /></Link>
           <button onClick={() => setDeleteConfirm(true)} className="btn-danger p-2.5"><Trash2 size={16} /></button>
         </div>
       </div>
 
-      {/* Contact info */}
+      {/* Stats */}
+      <div className="px-4 mb-4 grid grid-cols-3 gap-2">
+        <div className="card text-center py-3">
+          <p className="text-lg font-bold text-white">{orders.length}</p>
+          <p className="text-xs text-gray-500">Orders</p>
+        </div>
+        <div className="card text-center py-3">
+          <p className="text-lg font-bold text-brand-400">{fmt.currency(totalSpent)}</p>
+          <p className="text-xs text-gray-500">Total Spent</p>
+        </div>
+        <div className="card text-center py-3">
+          <p className="text-lg font-bold text-white">{measurements.length}</p>
+          <p className="text-xs text-gray-500">Measurements</p>
+        </div>
+      </div>
+
+      {/* Contact */}
       <div className="px-4 mb-4">
         <div className="card space-y-2">
-          {client.phone && (
-            <a href={`https://wa.me/${client.phone.replace(/\D/g, '')}`} className="flex items-center gap-2 text-sm text-green-400">
-              <Phone size={14} /> {client.phone}
+          {customer.phone && (
+            <a href={`https://wa.me/${customer.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-green-400">
+              <Phone size={14} /> {customer.phone}
             </a>
           )}
-          {client.instagram && (
+          {customer.email && (
+            <a href={`mailto:${customer.email}`} className="flex items-center gap-2 text-sm text-blue-400">
+              <span className="text-xs">✉</span> {customer.email}
+            </a>
+          )}
+          {customer.instagram && (
             <p className="flex items-center gap-2 text-sm text-pink-400">
-              <Instagram size={14} /> {client.instagram}
+              <Instagram size={14} /> {customer.instagram}
             </p>
           )}
-          {client.notes && <p className="text-xs text-gray-500">{client.notes}</p>}
+          {customer.notes && <p className="text-xs text-gray-500 pt-1 border-t border-gray-800">{customer.notes}</p>}
         </div>
       </div>
 
@@ -223,7 +279,7 @@ export function ClientDetailPage() {
       <div className="px-4 mb-4">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Measurements</h2>
-          <button onClick={() => setMModal(true)} className="text-brand-400 text-xs flex items-center gap-1"><Plus size={12} /> Add</button>
+          <button onClick={openAddMeasurement} className="text-brand-400 text-xs flex items-center gap-1"><Plus size={12} /> Add</button>
         </div>
         {measurements.length === 0 ? (
           <div className="card text-center py-6">
@@ -237,11 +293,7 @@ export function ClientDetailPage() {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-white">{m.label || 'Measurement'}</span>
                   <div className="flex gap-2">
-                    <button onClick={() => {
-                      setEditMeasurement(m)
-                      setMForm({ palluLength: m.palluLength || '', shoulderToNavel: m.shoulderToNavel || '', waistToFloor: m.waistToFloor || '', bodyWrap: m.bodyWrap || '', unit: m.unit, label: m.label || '', notes: m.notes || '' })
-                      setMModal(true)
-                    }} className="text-gray-500 hover:text-white"><Edit2 size={14} /></button>
+                    <button onClick={() => openEditMeasurement(m)} className="text-gray-500 hover:text-white"><Edit2 size={14} /></button>
                     <button onClick={async () => { await measurementsApi.delete(m.id); load() }} className="text-red-500 hover:text-red-300"><Trash2 size={14} /></button>
                   </div>
                 </div>
@@ -262,7 +314,7 @@ export function ClientDetailPage() {
       <div className="px-4 mb-4">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Orders ({orders.length})</h2>
-          <Link to={`/orders/new?clientId=${id}`} className="text-brand-400 text-xs flex items-center gap-1"><Plus size={12} /> New</Link>
+          <Link to={`/orders/new?customerId=${id}`} className="text-brand-400 text-xs flex items-center gap-1"><Plus size={12} /> New</Link>
         </div>
         {orders.length === 0 ? (
           <div className="card text-center py-6">
@@ -271,41 +323,39 @@ export function ClientDetailPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {orders.map(o => (
-              <Link key={o.id} to={`/orders/${o.id}`} className="card flex items-center gap-3 hover:border-gray-700 transition-colors">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-white">{ORDER_TYPE_LABELS[o.type]}</p>
-                  <p className="text-xs text-gray-500">{fmt.date(o.createdAt)}</p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <Badge className={STATUS_COLORS[o.status]}>{STATUS_LABELS[o.status]}</Badge>
-                  <span className="text-xs text-gray-400">{fmt.currency(o.priceCharged)}</span>
-                </div>
-              </Link>
-            ))}
+            {orders.map(o => {
+              const summary = o.items?.length
+                ? o.items.slice(0, 2).map((i: any) => i.name).join(', ')
+                : '—'
+              return (
+                <Link key={o.id} to={`/orders/${o.id}`} className="card flex items-center gap-3 hover:border-gray-700 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">{summary}</p>
+                    <p className="text-xs text-gray-500">{fmt.date(o.createdAt)}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge className={STATUS_COLORS[o.status]}>{STATUS_LABELS[o.status]}</Badge>
+                    <span className="text-xs text-gray-400">{fmt.currency(o.totalAmount)}</span>
+                  </div>
+                </Link>
+              )
+            })}
           </div>
         )}
       </div>
 
       {/* Measurement Modal */}
-      <Modal open={mModal} onClose={() => { setMModal(false); setEditMeasurement(null) }} title={editMeasurement ? 'Edit Measurement' : 'Add Measurement'}>
+      <Modal open={mModal} onClose={() => setMModal(false)} title={editMeasurement ? 'Edit Measurement' : 'Add Measurement'}>
         <div className="space-y-3">
           <Field label="Label (e.g. Wedding 2024)">
             <input className="input" value={mForm.label} onChange={e => setMForm(f => ({ ...f, label: e.target.value }))} placeholder="Optional label" />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Pallu Length">
-              <input type="number" step="0.1" className="input" value={mForm.palluLength} onChange={e => setMForm(f => ({ ...f, palluLength: e.target.value }))} />
-            </Field>
-            <Field label="Shoulder → Navel">
-              <input type="number" step="0.1" className="input" value={mForm.shoulderToNavel} onChange={e => setMForm(f => ({ ...f, shoulderToNavel: e.target.value }))} />
-            </Field>
-            <Field label="Chest">
-              <input type="number" step="0.1" className="input" value={mForm.waistToFloor} onChange={e => setMForm(f => ({ ...f, waistToFloor: e.target.value }))} />
-            </Field>
-            <Field label="Hip">
-              <input type="number" step="0.1" className="input" value={mForm.bodyWrap} onChange={e => setMForm(f => ({ ...f, bodyWrap: e.target.value }))} />
-            </Field>
+            {[['palluLength', 'Pallu Length'], ['shoulderToNavel', 'Shoulder → Navel'], ['waistToFloor', 'Chest'], ['bodyWrap', 'Hip']].map(([key, label]) => (
+              <Field key={key} label={label}>
+                <input type="number" step="0.1" className="input" value={(mForm as any)[key]} onChange={e => setMForm(f => ({ ...f, [key]: e.target.value }))} />
+              </Field>
+            ))}
           </div>
           <Field label="Unit">
             <select className="input" value={mForm.unit} onChange={e => setMForm(f => ({ ...f, unit: e.target.value }))}>
@@ -320,8 +370,8 @@ export function ClientDetailPage() {
         </div>
       </Modal>
 
-      <ConfirmDialog open={deleteConfirm} onClose={() => setDeleteConfirm(false)} onConfirm={deleteClient}
-        title="Delete Client" message="This will permanently delete the client and all associated data." danger />
+      <ConfirmDialog open={deleteConfirm} onClose={() => setDeleteConfirm(false)} onConfirm={deleteCustomer}
+        title="Delete Customer" message="This will permanently delete the customer and all associated data." danger />
     </div>
   )
 }

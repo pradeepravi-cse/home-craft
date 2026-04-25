@@ -1,6 +1,6 @@
-# Pleat Perfect — Business Manager
+# HomeCraft — Business Manager
 
-A full-stack mobile-first web app to manage your saree pleating/draping business and baking product inventory.
+A full-stack mobile-first web app to manage your home-based business — services, products, customers, orders, and earnings.
 
 ## Tech Stack
 - **Frontend**: React + Vite + TypeScript + Tailwind CSS + Zustand + Recharts
@@ -16,7 +16,7 @@ A full-stack mobile-first web app to manage your saree pleating/draping business
 ### 1. Clone / download and enter the project directory
 
 ```bash
-cd pleat-perfect
+cd homecraft
 ```
 
 ### 2. Create your `.env` file
@@ -67,7 +67,7 @@ Or create a named tunnel via the Cloudflare Zero Trust dashboard for a permanent
 ## 🏗️ Project Structure
 
 ```
-pleat-perfect/
+homecraft/
 ├── docker-compose.yml
 ├── .env.example
 ├── nginx/
@@ -78,7 +78,7 @@ pleat-perfect/
 │   │   ├── users/          # User accounts
 │   │   ├── clients/        # Client profiles
 │   │   ├── measurements/   # Saree measurements
-│   │   ├── orders/         # Orders (pre-pleating, draping, combo)
+│   │   ├── orders/         # Orders (pleating, draping, combo)
 │   │   ├── expenses/       # Per-order expenses
 │   │   ├── earnings/       # Revenue/profit analytics
 │   │   ├── products/       # Baking products catalogue
@@ -126,8 +126,8 @@ pleat-perfect/
 
 | Service | Price |
 |---------|-------|
-| Pre-Pleating (1 saree) | RM 20 |
-| Pre-Pleating (2+ sarees) | RM 15 per saree |
+| Saree Pleating (1 saree) | RM 20 |
+| Saree Pleating (2+ sarees) | RM 15 per saree |
 | Draping only | RM 30 |
 | Combo (pleating + draping, 1 saree) | RM 40 (RM5 off each) |
 | Combo (pleating + draping, 2+ sarees) | RM 25 per saree |
@@ -138,13 +138,13 @@ Prices are auto-suggested but editable per order.
 
 ## 📋 Order Flow
 
-**Pre-Pleating journey:**
+**Pleating journey:**
 `Received → Processing → Ready → Collected → Completed`
 
 **Draping journey:**
 `Received → Processing → Draped → Completed`
 
-**Combo:** follows Pre-Pleating flow.
+**Combo:** follows Pleating flow.
 
 ---
 

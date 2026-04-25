@@ -1,42 +1,44 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
-  CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn
+  CreateDateColumn, UpdateDateColumn,
+  ManyToOne, JoinColumn,
 } from 'typeorm';
-import { Client } from '../clients/client.entity';
+import { Customer } from '../customers/customer.entity';
 
 @Entity('measurements')
 export class Measurement {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => Client, (c) => c.measurements, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'clientId' })
-  client: Client;
+  @ManyToOne(() => Customer, (c) => c.measurements, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'customer_id' })
+  customer: Customer;
 
-  @Column()
-  clientId: string;
+  @Column({ name: 'customer_id' })
+  customerId: string;
 
-  // Core saree measurements
-  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
-  palluLength: number; // in inches or cm
+  @Column({ type: 'numeric', precision: 5, scale: 2, nullable: true })
+  palluLength: number;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+  @Column({ type: 'numeric', precision: 5, scale: 2, nullable: true })
   shoulderToNavel: number;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+  @Column({ type: 'numeric', precision: 5, scale: 2, nullable: true })
   waistToFloor: number;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+  @Column({ type: 'numeric', precision: 5, scale: 2, nullable: true })
   bodyWrap: number;
 
+  /** inches | cm */
   @Column({ default: 'inches' })
-  unit: string; // inches | cm
+  unit: string;
 
   @Column({ nullable: true })
   notes: string;
 
+  /** e.g. "Wedding 2024", "Default" */
   @Column({ nullable: true })
-  label: string; // e.g. "Wedding 2024", "Default"
+  label: string;
 
   @CreateDateColumn()
   createdAt: Date;

@@ -1,30 +1,31 @@
 import {
-  Controller, Get, Post, Put, Delete,
-  Param, Body, Query, UseGuards
+  Controller, Get, Post, Patch, Delete,
+  Param, Body, Query, UseGuards,
+  HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { ProductsService, CreateProductDto } from './products.service';
-import { BusinessLine } from './product.entity';
+import { ProductsService, CreateProductDto, UpdateProductDto } from './products.service';
+import { ProductCategory } from './product.entity';
 
-// Public endpoint - no auth required
+/** Public catalog — no auth required */
 @Controller('public/products')
 export class PublicProductsController {
-  constructor(private service: ProductsService) {}
+  constructor(private readonly service: ProductsService) {}
 
   @Get()
-  findPublic(@Query('businessLine') businessLine?: BusinessLine) {
-    return this.service.findAll(businessLine, true);
+  findPublic(@Query('category') category?: ProductCategory) {
+    return this.service.findAll(category, true);
   }
 }
 
 @Controller('products')
 @UseGuards(JwtAuthGuard)
 export class ProductsController {
-  constructor(private service: ProductsService) {}
+  constructor(private readonly service: ProductsService) {}
 
   @Get()
-  findAll(@Query('businessLine') businessLine?: BusinessLine) {
-    return this.service.findAll(businessLine);
+  findAll(@Query('category') category?: ProductCategory) {
+    return this.service.findAll(category);
   }
 
   @Get(':id')
@@ -33,16 +34,18 @@ export class ProductsController {
   }
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   create(@Body() dto: CreateProductDto) {
     return this.service.create(dto);
   }
 
-  @Put(':id')
-  update(@Param('id') id: string, @Body() dto: Partial<CreateProductDto>) {
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
     return this.service.update(id, dto);
   }
 
   @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: string) {
     return this.service.remove(id);
   }

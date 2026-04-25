@@ -9,27 +9,62 @@ export const fmt = {
   short: (d: string | Date) => format(new Date(d), 'dd MMM'),
 }
 
+// Order statuses (new model)
 export const STATUS_LABELS: Record<string, string> = {
-  received: 'Received', processing: 'Processing', ready: 'Ready',
-  collected: 'Collected', draped: 'Draped', completed: 'Completed',
+  PENDING: 'Pending',
+  CONFIRMED: 'Confirmed',
+  IN_PROGRESS: 'In Progress',
+  READY: 'Ready',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
 }
 export const STATUS_COLORS: Record<string, string> = {
-  received: 'bg-blue-900/40 text-blue-300',
-  processing: 'bg-yellow-900/40 text-yellow-300',
-  ready: 'bg-emerald-900/40 text-emerald-300',
-  collected: 'bg-purple-900/40 text-purple-300',
-  draped: 'bg-pink-900/40 text-pink-300',
-  completed: 'bg-gray-800 text-gray-400',
+  PENDING: 'bg-gray-800 text-gray-400',
+  CONFIRMED: 'bg-blue-900/40 text-blue-300',
+  IN_PROGRESS: 'bg-yellow-900/40 text-yellow-300',
+  READY: 'bg-emerald-900/40 text-emerald-300',
+  COMPLETED: 'bg-brand-900/40 text-brand-300',
+  CANCELLED: 'bg-red-900/40 text-red-400',
 }
-export const ORDER_TYPE_LABELS: Record<string, string> = {
-  pre_pleating: 'Pre-Pleating', draping: 'Draping', combo: 'Combo',
+
+export const ORDER_STATUSES = ['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'READY', 'COMPLETED', 'CANCELLED']
+
+export const NEXT_STATUS: Record<string, string> = {
+  PENDING: 'CONFIRMED',
+  CONFIRMED: 'IN_PROGRESS',
+  IN_PROGRESS: 'READY',
+  READY: 'COMPLETED',
 }
-export const ORDER_TYPE_COLORS: Record<string, string> = {
-  pre_pleating: 'bg-brand-900/40 text-brand-300',
-  draping: 'bg-amber-900/40 text-amber-300',
-  combo: 'bg-teal-900/40 text-teal-300',
+export const NEXT_STATUS_LABEL: Record<string, string> = {
+  PENDING: 'Confirm Order',
+  CONFIRMED: 'Start Processing',
+  IN_PROGRESS: 'Mark Ready',
+  READY: 'Mark Complete',
 }
+
 export const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
-  packing: 'Packing', safety_pins: 'Safety Pins', iron: 'Ironing',
-  electricity: 'Electricity', transport: 'Transport', material: 'Material', other: 'Other',
+  PACKING: 'Packing',
+  SAFETY_PINS: 'Safety Pins',
+  IRON: 'Ironing',
+  ELECTRICITY: 'Electricity',
+  TRANSPORT: 'Transport',
+  MATERIAL: 'Material',
+  LABOR: 'Labor',
+  OTHER: 'Other',
+}
+
+/** Turn-around time: days open (for active orders) or days taken (for completed) */
+export const tat = (createdAt: string, completedDate?: string | null): string => {
+  const start = new Date(createdAt)
+  const end = completedDate ? new Date(completedDate) : new Date()
+  const days = Math.floor((end.getTime() - start.getTime()) / 86_400_000)
+  if (days === 0) return '< 1d'
+  return `${days}d`
+}
+
+export const CONTACT_SOURCE_LABELS: Record<string, string> = {
+  whatsapp: 'WhatsApp',
+  instagram: 'Instagram',
+  referral: 'Referral',
+  'walk-in': 'Walk-in',
 }
