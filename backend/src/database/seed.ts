@@ -21,6 +21,7 @@ if (!DATABASE_URL) {
 const dataSource = new DataSource({
   type: 'postgres',
   url: DATABASE_URL,
+  schema: 'public',
   entities: [User, Service, Product, PricingRule],
   synchronize: true,
   logging: false,
