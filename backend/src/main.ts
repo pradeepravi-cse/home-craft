@@ -29,8 +29,12 @@ async function bootstrap() {
     }),
   );
 
+  const allowedOrigins = (process.env.FRONTEND_URL || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   app.enableCors({
-    origin: true,
+    origin: allowedOrigins.length ? allowedOrigins : true,
     credentials: true,
   });
 
