@@ -107,6 +107,7 @@ const IS_PROD = process.env.NODE_ENV === 'production';
       useFactory: () => ({
         type: 'postgres',
         url: process.env.DATABASE_URL,
+        schema: 'public',
         autoLoadEntities: true,
         synchronize: true,
         // TypeORM query logging off — application-level logging handles this
