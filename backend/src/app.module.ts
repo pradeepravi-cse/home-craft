@@ -108,6 +108,7 @@ const IS_PROD = process.env.NODE_ENV === 'production';
         type: 'postgres',
         url: process.env.DATABASE_URL,
         schema: 'public',
+        uuidExtension: 'pgcrypto',
         autoLoadEntities: true,
         synchronize: true,
         // TypeORM query logging off — application-level logging handles this

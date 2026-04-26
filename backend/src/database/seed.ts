@@ -22,6 +22,7 @@ const dataSource = new DataSource({
   type: 'postgres',
   url: DATABASE_URL,
   schema: 'public',
+  uuidExtension: 'pgcrypto',
   entities: [User, Service, Product, PricingRule],
   synchronize: true,
   logging: false,
