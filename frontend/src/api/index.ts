@@ -132,21 +132,6 @@ export const earningsApi = {
   byType: () => api.get('/earnings/by-type').then(r => r.data),
 }
 
-export const productsApi = {
-  list: (businessLine?: string) => api.get('/products', { params: { businessLine } }).then(r => r.data),
-  get: (id: string) => api.get(`/products/${id}`).then(r => r.data),
-  create: (data: Partial<Product>) => api.post('/products', data).then(r => r.data),
-  update: (id: string, data: Partial<Product>) => api.put(`/products/${id}`, data).then(r => r.data),
-  delete: (id: string) => api.delete(`/products/${id}`).then(r => r.data),
-}
-
-export const inventoryApi = {
-  list: () => api.get('/inventory').then(r => r.data),
-  lowStock: () => api.get('/inventory/low-stock').then(r => r.data),
-  transactions: (productId: string) => api.get(`/inventory/${productId}/transactions`).then(r => r.data),
-  upsert: (data: any) => api.post('/inventory', data).then(r => r.data),
-  addTransaction: (data: any) => api.post('/inventory/transaction', data).then(r => r.data),
-}
 
 export const dashboardApi = {
   get: () => api.get('/dashboard').then(r => r.data),
