@@ -7,6 +7,8 @@ import { OrderItem, OrderItemType } from '../orders/order-item.entity';
 
 @Injectable()
 export class EarningsService {
+  private readonly s: string; // schema prefix for raw SQL, e.g. "dev-db" or "public"
+
   constructor(
     @InjectPinoLogger(EarningsService.name)
     private readonly logger: PinoLogger,
@@ -14,7 +16,9 @@ export class EarningsService {
     private ordersRepo: Repository<Order>,
     @InjectRepository(OrderItem)
     private itemsRepo: Repository<OrderItem>,
-  ) {}
+  ) {
+    this.s = process.env.DB_SCHEMA || 'public';
+  }
 
   async getMonthly(year?: number): Promise<any[]> {
     const y = year || new Date().getFullYear();
@@ -27,7 +31,7 @@ export class EarningsService {
         COALESCE(SUM(CAST("totalAmount" AS numeric)), 0) AS revenue,
         COALESCE(SUM(CAST("totalExpenses" AS numeric)), 0) AS expenses,
         COUNT(*) AS order_count
-      FROM orders
+      FROM "${this.s}".orders
       WHERE EXTRACT(YEAR FROM "createdAt") = $1
         AND status = $2
       GROUP BY EXTRACT(MONTH FROM "createdAt")
@@ -61,7 +65,7 @@ export class EarningsService {
         COALESCE(SUM(CAST("totalAmount" AS numeric)), 0) AS total_revenue,
         COALESCE(SUM(CAST("totalExpenses" AS numeric)), 0) AS total_expenses,
         COUNT(*) AS total_orders
-      FROM orders
+      FROM "${this.s}".orders
       WHERE status = '${OrderStatus.COMPLETED}'
     `);
 
@@ -70,7 +74,7 @@ export class EarningsService {
         COALESCE(SUM(CAST("totalAmount" AS numeric)), 0) AS revenue,
         COALESCE(SUM(CAST("totalExpenses" AS numeric)), 0) AS expenses,
         COUNT(*) AS order_count
-      FROM orders
+      FROM "${this.s}".orders
       WHERE status = '${OrderStatus.COMPLETED}'
         AND DATE_TRUNC('month', "createdAt") = DATE_TRUNC('month', CURRENT_DATE)
     `);
@@ -103,8 +107,8 @@ export class EarningsService {
         oi.type,
         COALESCE(SUM(CAST(oi.subtotal AS numeric)), 0) AS revenue,
         COUNT(DISTINCT oi.order_id) AS order_count
-      FROM order_items oi
-      INNER JOIN orders o ON o.id = oi.order_id
+      FROM "${this.s}".order_items oi
+      INNER JOIN "${this.s}".orders o ON o.id = oi.order_id
       WHERE o.status = '${OrderStatus.COMPLETED}'
       GROUP BY oi.type
     `);
@@ -133,8 +137,8 @@ export class EarningsService {
         oi.name,
         COALESCE(SUM(CAST(oi.subtotal AS numeric)), 0) AS revenue,
         SUM(oi.quantity) AS units_sold
-      FROM order_items oi
-      INNER JOIN orders o ON o.id = oi.order_id
+      FROM "${this.s}".order_items oi
+      INNER JOIN "${this.s}".orders o ON o.id = oi.order_id
       WHERE oi.type = '${OrderItemType.PRODUCT}'
         AND o.status = '${OrderStatus.COMPLETED}'
       GROUP BY oi.reference_id, oi.name
@@ -154,8 +158,8 @@ export class EarningsService {
         oi.name,
         COALESCE(SUM(CAST(oi.subtotal AS numeric)), 0) AS revenue,
         SUM(oi.quantity) AS count
-      FROM order_items oi
-      INNER JOIN orders o ON o.id = oi.order_id
+      FROM "${this.s}".order_items oi
+      INNER JOIN "${this.s}".orders o ON o.id = oi.order_id
       WHERE oi.type = '${OrderItemType.SERVICE}'
         AND o.status = '${OrderStatus.COMPLETED}'
       GROUP BY oi.reference_id, oi.name
@@ -177,8 +181,8 @@ export class EarningsService {
         c.name AS "customerName",
         COALESCE(SUM(CAST(o."totalAmount" AS numeric)), 0) AS total_spent,
         COUNT(o.id) AS order_count
-      FROM orders o
-      INNER JOIN customers c ON c.id = o.customer_id
+      FROM "${this.s}".orders o
+      INNER JOIN "${this.s}".customers c ON c.id = o.customer_id
       WHERE o.status = '${OrderStatus.COMPLETED}'
       GROUP BY o.customer_id, c.name
       ORDER BY total_spent DESC

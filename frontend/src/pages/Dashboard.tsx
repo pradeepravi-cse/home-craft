@@ -4,7 +4,7 @@ import { dashboardApi } from '../api/client'
 import { StatCard, Spinner, Badge } from '../components/ui'
 import { fmt, STATUS_COLORS, STATUS_LABELS } from '../utils'
 import { useAuthStore } from '../store/auth'
-import { ArrowRight, Package, Scissors, TrendingUp } from 'lucide-react'
+import { ArrowRight, TrendingUp } from 'lucide-react'
 
 export default function Dashboard() {
   const { user } = useAuthStore()
@@ -23,11 +23,6 @@ export default function Dashboard() {
     if (h < 17) return 'Good afternoon'
     return 'Good evening'
   }
-
-  const totalRevenue = (data?.revenueSplit?.products || 0) + (data?.revenueSplit?.services || 0)
-  const revTotal = totalRevenue || 1 // avoid div/0
-  const productPct = Math.round(((data?.revenueSplit?.products || 0) / revTotal) * 100)
-  const servicePct = 100 - productPct
 
   return (
     <div className="px-4 py-5 space-y-5">
@@ -93,45 +88,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Revenue split */}
-      {totalRevenue > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Revenue Split</h2>
-          <div className="card space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-brand-900/40 border border-brand-800/40 flex items-center justify-center flex-shrink-0">
-                <Scissors size={14} className="text-brand-400" />
-              </div>
-              <div className="flex-1">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-300">Services</span>
-                  <span className="text-white font-medium">{fmt.currency(data?.revenueSplit?.services || 0)}</span>
-                </div>
-                <div className="w-full bg-gray-800 rounded-full h-1.5">
-                  <div className="bg-brand-500 h-1.5 rounded-full" style={{ width: `${servicePct}%` }} />
-                </div>
-              </div>
-              <span className="text-xs text-gray-500 w-8 text-right">{servicePct}%</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-amber-900/40 border border-amber-800/40 flex items-center justify-center flex-shrink-0">
-                <Package size={14} className="text-amber-400" />
-              </div>
-              <div className="flex-1">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-300">Products</span>
-                  <span className="text-white font-medium">{fmt.currency(data?.revenueSplit?.products || 0)}</span>
-                </div>
-                <div className="w-full bg-gray-800 rounded-full h-1.5">
-                  <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: `${productPct}%` }} />
-                </div>
-              </div>
-              <span className="text-xs text-gray-500 w-8 text-right">{productPct}%</span>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Quick actions */}
       <div>
         <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Quick Actions</h2>
@@ -139,7 +95,7 @@ export default function Dashboard() {
           <Link to="/orders/new" className="card hover:border-brand-700 transition-colors flex flex-col gap-2">
             <span className="text-2xl">🛍️</span>
             <span className="text-sm font-medium text-white">New Order</span>
-            <span className="text-xs text-gray-500">Services or products</span>
+            <span className="text-xs text-gray-500">Add a service order</span>
           </Link>
           <Link to="/customers/new" className="card hover:border-brand-700 transition-colors flex flex-col gap-2">
             <span className="text-2xl">👤</span>

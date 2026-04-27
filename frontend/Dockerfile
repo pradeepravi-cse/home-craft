@@ -4,8 +4,15 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 COPY pnpm-lock.yaml package.json ./
 RUN pnpm install --frozen-lockfile
 COPY . .
+
+# VITE_* vars are baked into the bundle at build time — declare every one as an ARG
 ARG VITE_API_URL=/api
-ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_APP_NAME=HomeCraft
+ARG VITE_APP_TAGLINE=Business Manager
+ENV VITE_API_URL=$VITE_API_URL \
+    VITE_APP_NAME=$VITE_APP_NAME \
+    VITE_APP_TAGLINE=$VITE_APP_TAGLINE
+
 RUN pnpm run build
 
 FROM nginx:alpine

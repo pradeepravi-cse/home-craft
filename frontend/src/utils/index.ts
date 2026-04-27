@@ -62,6 +62,23 @@ export const tat = (createdAt: string, completedDate?: string | null): string =>
   return `${days}d`
 }
 
+/**
+ * Extracts a human-readable message from any API error shape.
+ * Handles: NestJS class-validator arrays, plain strings, network errors.
+ */
+export function getErrorMessage(err: any, fallback = 'Something went wrong. Please try again.'): string {
+  if (!err.response) {
+    return 'Unable to reach the server. Check your connection and try again.'
+  }
+  const msg = err.response?.data?.message
+  if (Array.isArray(msg)) return msg[0] // class-validator returns array; first is most relevant
+  if (typeof msg === 'string' && msg.trim()) return msg
+  const status = err.response?.status
+  if (status === 429) return 'Too many attempts. Please wait a moment and try again.'
+  if (status >= 500) return 'A server error occurred. Please try again later.'
+  return fallback
+}
+
 export const CONTACT_SOURCE_LABELS: Record<string, string> = {
   whatsapp: 'WhatsApp',
   instagram: 'Instagram',

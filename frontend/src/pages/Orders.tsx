@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ordersApi, customersApi, servicesApi, productsApi, expensesApi, measurementsApi } from '../api/client'
+import { ordersApi, customersApi, servicesApi, expensesApi, measurementsApi } from '../api/client'
 import { PageHeader, Empty, Spinner, Badge, Modal, Field, ConfirmDialog } from '../components/ui'
 import { fmt, tat, STATUS_COLORS, STATUS_LABELS, NEXT_STATUS, NEXT_STATUS_LABEL, EXPENSE_CATEGORY_LABELS, ORDER_STATUSES } from '../utils'
 import toast from 'react-hot-toast'
@@ -156,13 +156,12 @@ export function NewOrderPage() {
   const [searchParams] = useSearchParams()
   const [customers, setCustomers] = useState<any[]>([])
   const [services, setServices] = useState<any[]>([])
-  const [products, setProducts] = useState<any[]>([])
   const [items, setItems] = useState<Array<{ type: string; referenceId: string; name: string; price: number; quantity: number }>>([])
   const [form, setForm] = useState({
     customerId: searchParams.get('customerId') || '',
     notes: '', scheduledDate: '',
   })
-  const [addModal, setAddModal] = useState<'service' | 'product' | null>(null)
+  const [addModal, setAddModal] = useState<'service' | null>(null)
   const [pricing, setPricing] = useState<{ subtotal: number; discountAmount: number; totalAmount: number; appliedRules: string[] } | null>(null)
   const [saving, setSaving] = useState(false)
   const [measurements, setMeasurements] = useState<any[]>([])
@@ -171,8 +170,7 @@ export function NewOrderPage() {
     Promise.all([
       customersApi.list(),
       servicesApi.list(true),
-      productsApi.list(),
-    ]).then(([c, s, p]) => { setCustomers(c); setServices(s); setProducts(p) })
+    ]).then(([c, s]) => { setCustomers(c); setServices(s) })
   }, [])
 
   // Fetch customer measurements whenever customer changes
@@ -311,21 +309,15 @@ export function NewOrderPage() {
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="label">Order Items *</label>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setAddModal('service')}
-                className="flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 border border-brand-800/50 bg-brand-900/30 px-2 py-1 rounded-lg transition-colors">
-                <Scissors size={11} /> Service
-              </button>
-              <button type="button" onClick={() => setAddModal('product')}
-                className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 border border-amber-800/50 bg-amber-900/30 px-2 py-1 rounded-lg transition-colors">
-                <Package size={11} /> Product
-              </button>
-            </div>
+            <button type="button" onClick={() => setAddModal('service')}
+              className="flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 border border-brand-800/50 bg-brand-900/30 px-2 py-1 rounded-lg transition-colors">
+              <Scissors size={11} /> Add Service
+            </button>
           </div>
 
           {items.length === 0 ? (
             <div className="card border-dashed text-center py-8 text-gray-500 text-sm">
-              No items yet — add a service or product above
+              No items yet — add a service above
             </div>
           ) : (
             <div className="space-y-2">
@@ -407,24 +399,6 @@ export function NewOrderPage() {
         </div>
       </Modal>
 
-      {/* Add Product Modal */}
-      <Modal open={addModal === 'product'} onClose={() => setAddModal(null)} title="Add Product">
-        <div className="space-y-2">
-          {products.filter(p => p.isActive && !items.find(i => i.referenceId === p.id)).map(p => (
-            <button key={p.id} onClick={() => addItem('PRODUCT', p)} className="w-full card hover:border-amber-700 transition-colors flex items-center gap-3 text-left">
-              <div className="w-8 h-8 rounded-lg bg-amber-900/40 flex items-center justify-center flex-shrink-0"><Package size={14} className="text-amber-400" /></div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white">{p.name}</p>
-                <p className="text-xs text-gray-500">{p.category} {p.unit ? `· ${p.unit}` : ''}</p>
-              </div>
-              <span className="text-sm font-semibold text-amber-300">{fmt.currency(p.price)}</span>
-            </button>
-          ))}
-          {products.filter(p => p.isActive && !items.find(i => i.referenceId === p.id)).length === 0 && (
-            <p className="text-gray-500 text-sm text-center py-4">All active products already added</p>
-          )}
-        </div>
-      </Modal>
     </div>
   )
 }

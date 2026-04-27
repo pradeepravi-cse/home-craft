@@ -58,11 +58,20 @@ services:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/homecraft
+      DB_SCHEMA: ${DB_SCHEMA:-public}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       ADMIN_NAME: ${ADMIN_NAME:-Admin}
+      APP_NAME: ${APP_NAME:-HomeCraft}
+      APP_URL: ${APP_URL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      FROM_EMAIL: ${FROM_EMAIL}
     depends_on:
       postgres:
         condition: service_healthy
@@ -88,6 +97,8 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: /api
+        VITE_APP_NAME: ${APP_NAME:-HomeCraft}
+        VITE_APP_TAGLINE: ${VITE_APP_TAGLINE:-Business Manager}
     image: homecraft-frontend:latest
     container_name: homecraft-frontend
     restart: always

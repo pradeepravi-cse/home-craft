@@ -24,11 +24,23 @@ api.interceptors.response.use(
   }
 )
 
+// Users (team management)
+export const usersApi = {
+  list: () => api.get('/users').then(r => r.data),
+  invite: (data: { name: string; email: string; role: string }) =>
+    api.post('/users', data).then(r => r.data),
+  updateRole: (id: string, role: string) => api.patch(`/users/${id}/role`, { role }).then(r => r.data),
+  toggleActive: (id: string) => api.patch(`/users/${id}/toggle-active`).then(r => r.data),
+  delete: (id: string) => api.delete(`/users/${id}`).then(r => r.data),
+}
+
 // Auth
 export const authApi = {
-  setupCheck: () => api.get('/auth/setup').then(r => r.data),
   login: (email: string, password: string) => api.post('/auth/login', { email, password }).then(r => r.data),
-  register: (email: string, password: string, name: string) => api.post('/auth/register', { email, password, name }).then(r => r.data),
+  acceptInvite: (token: string, newPassword: string) => api.post('/auth/accept-invite', { token, newPassword }).then(r => r.data),
+  forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }).then(r => r.data),
+  resetPassword: (token: string, newPassword: string) => api.post('/auth/reset-password', { token, newPassword }).then(r => r.data),
+  changePassword: (currentPassword: string, newPassword: string) => api.post('/auth/change-password', { currentPassword, newPassword }).then(r => r.data),
 }
 
 // Dashboard
@@ -91,15 +103,6 @@ export const earningsApi = {
   topProducts: (limit?: number) => api.get('/earnings/top-products', { params: { limit } }).then(r => r.data),
   topServices: (limit?: number) => api.get('/earnings/top-services', { params: { limit } }).then(r => r.data),
   customerLTV: (limit?: number) => api.get('/earnings/customer-ltv', { params: { limit } }).then(r => r.data),
-}
-
-// Products
-export const productsApi = {
-  list: (category?: string) => api.get('/products', { params: { category } }).then(r => r.data),
-  get: (id: string) => api.get(`/products/${id}`).then(r => r.data),
-  create: (data: any) => api.post('/products', data).then(r => r.data),
-  update: (id: string, data: any) => api.patch(`/products/${id}`, data).then(r => r.data),
-  delete: (id: string) => api.delete(`/products/${id}`).then(r => r.data),
 }
 
 // Pricing rules

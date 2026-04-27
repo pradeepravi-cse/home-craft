@@ -104,16 +104,22 @@ const IS_PROD = process.env.NODE_ENV === 'production';
     ConfigModule,
 
     TypeOrmModule.forRootAsync({
-      useFactory: () => ({
-        type: 'postgres',
-        url: process.env.DATABASE_URL,
-        schema: 'public',
-        uuidExtension: 'pgcrypto',
-        autoLoadEntities: true,
-        synchronize: true,
-        // TypeORM query logging off — application-level logging handles this
-        logging: false,
-      }),
+      useFactory: () => {
+        const schema = process.env.DB_SCHEMA || 'public';
+        return {
+          type: 'postgres',
+          url: process.env.DATABASE_URL,
+          schema,
+          // Set search_path so the PG connection resolves unqualified table names
+          // to the correct schema. Works for direct connections; raw SQL in services
+          // uses explicit schema qualification as the reliable fallback.
+          extra: { options: `-c search_path="${schema}"` },
+          uuidExtension: 'pgcrypto',
+          autoLoadEntities: true,
+          synchronize: true,
+          logging: false,
+        };
+      },
     }),
 
     AuditLogModule,
