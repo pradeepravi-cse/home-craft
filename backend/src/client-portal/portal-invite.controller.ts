@@ -1,5 +1,5 @@
 import {
-  Controller, Post, Param, UseGuards,
+  Controller, Get, Post, Param, UseGuards,
   NotFoundException, ConflictException,
 } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
@@ -25,6 +25,15 @@ export class PortalInviteController {
     private readonly usersService: UsersService,
     private readonly mailService: MailService,
   ) {}
+
+  @Get(':customerId/status')
+  async status(@Param('customerId') customerId: string) {
+    const user = await this.usersService.findByCustomerId(customerId);
+    return {
+      hasPortalAccount: !!user,
+      isActive: user?.isActive ?? null,
+    };
+  }
 
   @Post(':customerId')
   async invite(@Param('customerId') customerId: string) {

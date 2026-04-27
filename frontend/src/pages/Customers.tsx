@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { customersApi, measurementsApi, ordersApi } from '../api/client'
+import { customersApi, measurementsApi, ordersApi, portalApi } from '../api/client'
 import { PageHeader, Empty, Spinner, Badge, Modal, Field, ConfirmDialog } from '../components/ui'
-import { fmt, STATUS_COLORS, STATUS_LABELS, CONTACT_SOURCE_LABELS } from '../utils'
+import { fmt, STATUS_COLORS, STATUS_LABELS, CONTACT_SOURCE_LABELS, getErrorMessage } from '../utils'
 import toast from 'react-hot-toast'
-import { Plus, User, Phone, Instagram, Trash2, Edit2, Ruler, ShoppingBag, ChevronRight } from 'lucide-react'
+import { Plus, User, Phone, Instagram, Trash2, Edit2, Ruler, ShoppingBag, ChevronRight, Globe, Loader2 } from 'lucide-react'
 
 // ─── Customer List ────────────────────────────────────────────────────────────
 export function CustomersPage() {
@@ -160,6 +160,8 @@ export function CustomerDetailPage() {
   })
   const [editMeasurement, setEditMeasurement] = useState<any>(null)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [portalStatus, setPortalStatus] = useState<{ hasPortalAccount: boolean; isActive: boolean | null } | null>(null)
+  const [inviting, setInviting] = useState(false)
 
   const load = async () => {
     const [c, o, m] = await Promise.all([
@@ -169,6 +171,21 @@ export function CustomerDetailPage() {
     ])
     setCustomer(c); setOrders(o); setMeasurements(m)
     setLoading(false)
+    // Load portal status separately so it doesn't block the main load
+    portalApi.status(id!).then(setPortalStatus).catch(() => {})
+  }
+
+  const inviteToPortal = async () => {
+    setInviting(true)
+    try {
+      await portalApi.invite(id!)
+      toast.success('Portal invite sent!')
+      portalApi.status(id!).then(setPortalStatus)
+    } catch (err: any) {
+      toast.error(getErrorMessage(err, 'Failed to send portal invite.'))
+    } finally {
+      setInviting(false)
+    }
   }
 
   useEffect(() => { load() }, [id])
@@ -272,6 +289,43 @@ export function CustomerDetailPage() {
             </p>
           )}
           {customer.notes && <p className="text-xs text-gray-500 pt-1 border-t border-gray-800">{customer.notes}</p>}
+        </div>
+      </div>
+
+      {/* Customer Portal */}
+      <div className="px-4 mb-4">
+        <div className="card flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-brand-900/40 border border-brand-800/40 flex items-center justify-center flex-shrink-0">
+            <Globe size={14} className="text-brand-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-white">Customer Portal</p>
+            {portalStatus === null ? (
+              <p className="text-xs text-gray-500">Checking…</p>
+            ) : portalStatus.hasPortalAccount ? (
+              <p className="text-xs text-gray-500">
+                Account {portalStatus.isActive ? (
+                  <span className="text-emerald-400">active</span>
+                ) : (
+                  <span className="text-red-400">inactive</span>
+                )} — manage in <span className="text-brand-400">Team → Client Portal</span>
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500">
+                {customer.email ? 'Not invited yet' : 'Add an email address to invite'}
+              </p>
+            )}
+          </div>
+          {portalStatus !== null && !portalStatus.hasPortalAccount && customer.email && (
+            <button
+              onClick={inviteToPortal}
+              disabled={inviting}
+              className="flex-shrink-0 flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 border border-brand-800/50 bg-brand-900/20 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {inviting ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+              {inviting ? 'Sending…' : 'Invite'}
+            </button>
+          )}
         </div>
       </div>
 
