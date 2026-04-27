@@ -2,7 +2,8 @@ import * as path from 'path';
 import * as dotenv from 'dotenv';
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 import { Module } from '@nestjs/common';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { LoggerModule } from 'nestjs-pino';
 import { ClsModule, ClsService } from 'nestjs-cls';
@@ -29,6 +30,7 @@ import { BusinessSettingsModule } from './business-settings/business-settings.mo
 import { InvestmentsModule } from './investments/investments.module';
 
 import { AuditLogModule } from './audit/audit-log.module';
+import { ClientPortalModule } from './client-portal/client-portal.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { HttpLoggingInterceptor } from './common/interceptors/http-logging.interceptor';
 
@@ -101,6 +103,14 @@ const IS_PROD = process.env.NODE_ENV === 'production';
       }),
     }),
 
+    // Rate limiting — global guard applied to every endpoint
+    // Login endpoints override with stricter limits via @Throttle()
+    ThrottlerModule.forRoot([{
+      name: 'default',
+      ttl: 60_000,   // 1 minute window
+      limit: 200,    // 200 requests per IP per minute
+    }]),
+
     ConfigModule,
 
     TypeOrmModule.forRootAsync({
@@ -123,6 +133,7 @@ const IS_PROD = process.env.NODE_ENV === 'production';
     }),
 
     AuditLogModule,
+    ClientPortalModule,
     AuthModule,
     UsersModule,
     CustomersModule,
@@ -142,9 +153,9 @@ const IS_PROD = process.env.NODE_ENV === 'production';
     InvestmentsModule,
   ],
   providers: [
-    // Global exception filter — logs 4xx as warn, 5xx as error, adds correlationId to response
+    // Rate limiting enforced on every endpoint globally
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
-    // Global interceptor — logs request start/end, sets userId in CLS, writes HTTP audit rows
     { provide: APP_INTERCEPTOR, useClass: HttpLoggingInterceptor },
   ],
 })

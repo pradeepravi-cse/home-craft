@@ -1,4 +1,5 @@
 import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { IsEmail, IsString, MinLength } from 'class-validator';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -47,11 +48,14 @@ class ChangePasswordDto {
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  // 5 attempts per 15 minutes per IP
+  @Throttle({ default: { ttl: 900_000, limit: 5 } })
   @Post('login')
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto.email, dto.password);
   }
 
+  @Throttle({ default: { ttl: 900_000, limit: 5 } })
   @Post('forgot-password')
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto.email);

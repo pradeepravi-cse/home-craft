@@ -90,9 +90,8 @@ export class UsersService {
     await this.usersRepo.delete(id);
   }
 
-  async createInvited(email: string, name: string, role: UserRole): Promise<{ user: User; token: string }> {
+  async createInvited(email: string, name: string, role: UserRole, customerId?: string): Promise<{ user: User; token: string }> {
     this.logger.info({ role }, 'users:createInvited');
-    // Random unusable password — user sets their own via invite link
     const hashed = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
     const token = crypto.randomBytes(32).toString('hex');
     const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
@@ -100,13 +99,18 @@ export class UsersService {
     const user = this.usersRepo.create({
       email, name, role,
       password: hashed,
-      isActive: false, // inactive until they accept the invite
+      isActive: false,
+      customerId: customerId ?? null,
       resetToken: token,
       resetTokenExpiry: expiry,
     });
     const saved = await this.usersRepo.save(user);
     this.logger.info({ id: saved.id, role }, 'users:invited created');
     return { user: saved, token };
+  }
+
+  findByCustomerId(customerId: string): Promise<User | null> {
+    return this.usersRepo.findOne({ where: { customerId } });
   }
 
   async activateFromInvite(id: string, hashedPassword: string): Promise<void> {
