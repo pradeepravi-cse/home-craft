@@ -21,17 +21,22 @@ export class Customer {
   @Column()
   name: string;
 
+  /** Short name / WhatsApp name the customer goes by */
+  @Column({ nullable: true })
+  nickname: string;
+
   @Column({ nullable: true })
   phone: string;
 
+  @Column({ nullable: true })
+  notes: string;
+
+  // email and instagram kept nullable for backward compatibility with existing records
   @Column({ nullable: true })
   email: string;
 
   @Column({ nullable: true })
   instagram: string;
-
-  @Column({ nullable: true })
-  notes: string;
 
   @Column({ type: 'enum', enum: ContactSource, default: ContactSource.WHATSAPP })
   contactSource: ContactSource;

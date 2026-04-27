@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { customersApi, measurementsApi, ordersApi, portalApi } from '../api/client'
 import { PageHeader, Empty, Spinner, Badge, Modal, Field, ConfirmDialog } from '../components/ui'
-import { fmt, STATUS_COLORS, STATUS_LABELS, CONTACT_SOURCE_LABELS, getErrorMessage } from '../utils'
+import { fmt, STATUS_COLORS, STATUS_LABELS, getErrorMessage } from '../utils'
 import toast from 'react-hot-toast'
-import { Plus, User, Phone, Instagram, Trash2, Edit2, Ruler, ShoppingBag, ChevronRight, Globe, Loader2 } from 'lucide-react'
+import { Plus, User, Phone, Trash2, Edit2, Ruler, ShoppingBag, ChevronRight, Globe, Loader2 } from 'lucide-react'
 
 // ─── Customer List ────────────────────────────────────────────────────────────
 export function CustomersPage() {
@@ -36,7 +36,7 @@ export function CustomersPage() {
       <div className="px-4 mb-4">
         <input
           className="input"
-          placeholder="Search by name, phone, or Instagram…"
+          placeholder="Search by name, nickname or phone…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -56,7 +56,9 @@ export function CustomersPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-white truncate">{c.name}</p>
-                <p className="text-xs text-gray-500">{c.phone || c.instagram || 'No contact info'}</p>
+                <p className="text-xs text-gray-500">
+                  {c.nickname ? `"${c.nickname}" · ` : ''}{c.phone || 'No phone'}
+                </p>
               </div>
               <div className="flex flex-col items-end gap-1">
                 <span className="text-xs text-gray-500">{c.measurements?.length || 0} measurements</span>
@@ -75,16 +77,14 @@ export function CustomerFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const isEdit = Boolean(id)
-  const [form, setForm] = useState({
-    name: '', phone: '', email: '', instagram: '',
-    contactSource: 'whatsapp', notes: '',
-  })
+  const [form, setForm] = useState({ name: '', nickname: '', phone: '', notes: '' })
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (isEdit) customersApi.get(id!).then(c => setForm({
-      name: c.name, phone: c.phone || '', email: c.email || '',
-      instagram: c.instagram || '', contactSource: c.contactSource || 'whatsapp',
+      name: c.name,
+      nickname: c.nickname || '',
+      phone: c.phone || '',
       notes: c.notes || '',
     }))
   }, [id])
@@ -92,12 +92,10 @@ export function CustomerFormPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    // Strip empty optional fields so backend validators don't reject them
-    const payload: any = { ...form }
-    if (!payload.email) delete payload.email
-    if (!payload.instagram) delete payload.instagram
-    if (!payload.phone) delete payload.phone
-    if (!payload.notes) delete payload.notes
+    const payload: any = { name: form.name }
+    if (form.nickname) payload.nickname = form.nickname
+    if (form.phone) payload.phone = form.phone
+    if (form.notes) payload.notes = form.notes
     try {
       if (isEdit) {
         await customersApi.update(id!, payload)
@@ -105,7 +103,7 @@ export function CustomerFormPage() {
         navigate(-1)
       } else {
         const c = await customersApi.create(payload)
-        toast.success('Customer created')
+        toast.success('Customer added')
         navigate(`/customers/${c.id}`)
       }
     } catch { toast.error('Failed to save') } finally { setSaving(false) }
@@ -116,29 +114,28 @@ export function CustomerFormPage() {
       <PageHeader title={isEdit ? 'Edit Customer' : 'New Customer'} />
       <form onSubmit={submit} className="px-4 space-y-4">
         <Field label="Full Name *">
-          <input className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="Customer's name" />
+          <input className="input" value={form.name}
+            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+            required placeholder="e.g. Siti Nurhaliza" />
         </Field>
-        <Field label="WhatsApp Number">
-          <input className="input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+60xxxxxxxxx" />
+        <Field label="Nickname / WhatsApp Name">
+          <input className="input" value={form.nickname}
+            onChange={e => setForm(f => ({ ...f, nickname: e.target.value }))}
+            placeholder="What they go by, e.g. Siti" />
         </Field>
-        <Field label="Email">
-          <input type="email" className="input" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="email@example.com" />
-        </Field>
-        <Field label="Instagram Handle">
-          <input className="input" value={form.instagram} onChange={e => setForm(f => ({ ...f, instagram: e.target.value }))} placeholder="@handle" />
-        </Field>
-        <Field label="Contact Source">
-          <select className="input" value={form.contactSource} onChange={e => setForm(f => ({ ...f, contactSource: e.target.value }))}>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="instagram">Instagram</option>
-            <option value="referral">Referral</option>
-            <option value="walk-in">Walk-in</option>
-          </select>
+        <Field label="WhatsApp Number *">
+          <input className="input" value={form.phone}
+            onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+            required placeholder="+601x-xxxxxxx" />
         </Field>
         <Field label="Notes">
-          <textarea className="input min-h-[80px]" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Any special notes…" />
+          <textarea className="input min-h-[80px]" value={form.notes}
+            onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+            placeholder="Any special notes…" />
         </Field>
-        <button type="submit" disabled={saving} className="btn-primary w-full">{saving ? 'Saving…' : 'Save Customer'}</button>
+        <button type="submit" disabled={saving} className="btn-primary w-full">
+          {saving ? 'Saving…' : 'Save Customer'}
+        </button>
         <button type="button" onClick={() => navigate(-1)} className="btn-secondary w-full">Cancel</button>
       </form>
     </div>
@@ -245,7 +242,7 @@ export function CustomerDetailPage() {
           </div>
           <div>
             <h1 className="font-display text-xl font-bold text-white">{customer.name}</h1>
-            <p className="text-xs text-gray-500">{CONTACT_SOURCE_LABELS[customer.contactSource] || customer.contactSource}</p>
+            {customer.phone && <p className="text-xs text-gray-500">{customer.phone}</p>}
           </div>
         </div>
         <div className="flex gap-2">
@@ -273,20 +270,18 @@ export function CustomerDetailPage() {
       {/* Contact */}
       <div className="px-4 mb-4">
         <div className="card space-y-2">
-          {customer.phone && (
-            <a href={`https://wa.me/${customer.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-green-400">
+          {customer.nickname && (
+            <p className="text-sm text-gray-300">
+              <span className="text-gray-500 text-xs">Known as </span>{customer.nickname}
+            </p>
+          )}
+          {customer.phone ? (
+            <a href={`https://wa.me/${customer.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer"
+              className="flex items-center gap-2 text-sm text-green-400 hover:text-green-300 transition-colors">
               <Phone size={14} /> {customer.phone}
             </a>
-          )}
-          {customer.email && (
-            <a href={`mailto:${customer.email}`} className="flex items-center gap-2 text-sm text-blue-400">
-              <span className="text-xs">✉</span> {customer.email}
-            </a>
-          )}
-          {customer.instagram && (
-            <p className="flex items-center gap-2 text-sm text-pink-400">
-              <Instagram size={14} /> {customer.instagram}
-            </p>
+          ) : (
+            <p className="text-xs text-gray-600">No phone number</p>
           )}
           {customer.notes && <p className="text-xs text-gray-500 pt-1 border-t border-gray-800">{customer.notes}</p>}
         </div>

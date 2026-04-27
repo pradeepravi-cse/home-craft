@@ -1,9 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike } from 'typeorm';
-import {
-  IsString, IsOptional, IsEmail, IsEnum,
-} from 'class-validator';
+import { IsString, IsOptional } from 'class-validator';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Customer, ContactSource } from './customer.entity';
 
@@ -13,23 +11,15 @@ export class CreateCustomerDto {
 
   @IsOptional()
   @IsString()
-  phone?: string;
-
-  @IsOptional()
-  @IsEmail()
-  email?: string;
+  nickname?: string;
 
   @IsOptional()
   @IsString()
-  instagram?: string;
+  phone?: string;
 
   @IsOptional()
   @IsString()
   notes?: string;
-
-  @IsOptional()
-  @IsEnum(ContactSource)
-  contactSource?: ContactSource;
 }
 
 export class UpdateCustomerDto {
@@ -39,23 +29,15 @@ export class UpdateCustomerDto {
 
   @IsOptional()
   @IsString()
-  phone?: string;
-
-  @IsOptional()
-  @IsEmail()
-  email?: string;
+  nickname?: string;
 
   @IsOptional()
   @IsString()
-  instagram?: string;
+  phone?: string;
 
   @IsOptional()
   @IsString()
   notes?: string;
-
-  @IsOptional()
-  @IsEnum(ContactSource)
-  contactSource?: ContactSource;
 }
 
 @Injectable()
@@ -74,8 +56,8 @@ export class CustomersService {
       ? await this.repo.find({
           where: [
             { name: ILike(`%${search}%`) },
+            { nickname: ILike(`%${search}%`) },
             { phone: ILike(`%${search}%`) },
-            { instagram: ILike(`%${search}%`) },
           ],
           relations: ['measurements'],
           order: { createdAt: 'DESC' },
@@ -99,9 +81,8 @@ export class CustomersService {
   }
 
   async create(dto: CreateCustomerDto): Promise<Customer> {
-    // Log contactSource only — never name/phone/email/instagram/notes
-    this.logger.info({ contactSource: dto.contactSource }, 'customers:create');
-    const customer = this.repo.create(dto);
+    this.logger.info('customers:create');
+    const customer = this.repo.create({ ...dto, contactSource: ContactSource.WHATSAPP });
     const saved = await this.repo.save(customer);
     this.logger.info({ id: saved.id }, 'customers:created');
     return saved;
