@@ -24,14 +24,6 @@ api.interceptors.response.use(
   }
 )
 
-// Customer portal management (admin actions)
-export const portalApi = {
-  status: (customerId: string) =>
-    api.get(`/portal/invite/${customerId}/status`).then(r => r.data),
-  invite: (customerId: string) =>
-    api.post(`/portal/invite/${customerId}`).then(r => r.data),
-}
-
 // Users (team management)
 export const usersApi = {
   list: () => api.get('/users').then(r => r.data),

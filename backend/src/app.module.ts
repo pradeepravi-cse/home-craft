@@ -30,7 +30,6 @@ import { BusinessSettingsModule } from './business-settings/business-settings.mo
 import { InvestmentsModule } from './investments/investments.module';
 
 import { AuditLogModule } from './audit/audit-log.module';
-import { ClientPortalModule } from './client-portal/client-portal.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { HttpLoggingInterceptor } from './common/interceptors/http-logging.interceptor';
 
@@ -133,7 +132,6 @@ const IS_PROD = process.env.NODE_ENV === 'production';
     }),
 
     AuditLogModule,
-    ClientPortalModule,
     AuthModule,
     UsersModule,
     CustomersModule,

@@ -28,10 +28,6 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
-  // Populated only for CLIENT-role users — links them to a customer record
-  @Column({ nullable: true, name: 'customer_id', type: 'uuid' })
-  customerId: string | null;
-
   @Column({ nullable: true, type: 'varchar' })
   resetToken: string | null;
 

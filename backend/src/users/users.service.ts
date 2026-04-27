@@ -90,7 +90,7 @@ export class UsersService {
     await this.usersRepo.delete(id);
   }
 
-  async createInvited(email: string, name: string, role: UserRole, customerId?: string): Promise<{ user: User; token: string }> {
+  async createInvited(email: string, name: string, role: UserRole): Promise<{ user: User; token: string }> {
     this.logger.info({ role }, 'users:createInvited');
     const hashed = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
     const token = crypto.randomBytes(32).toString('hex');
@@ -100,17 +100,12 @@ export class UsersService {
       email, name, role,
       password: hashed,
       isActive: false,
-      customerId: customerId ?? null,
       resetToken: token,
       resetTokenExpiry: expiry,
     });
     const saved = await this.usersRepo.save(user);
     this.logger.info({ id: saved.id, role }, 'users:invited created');
     return { user: saved, token };
-  }
-
-  findByCustomerId(customerId: string): Promise<User | null> {
-    return this.usersRepo.findOne({ where: { customerId } });
   }
 
   async activateFromInvite(id: string, hashedPassword: string): Promise<void> {

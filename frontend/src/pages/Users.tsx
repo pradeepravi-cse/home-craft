@@ -1,21 +1,19 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
 import { usersApi } from '../api/client'
 import { PageHeader, Spinner, Modal, Field, ConfirmDialog, Badge } from '../components/ui'
 import { useAuthStore } from '../store/auth'
 import { getErrorMessage } from '../utils'
 import toast from 'react-hot-toast'
-import { Plus, ShieldCheck, ShieldOff, Trash2, Users, Globe } from 'lucide-react'
+import { Plus, ShieldCheck, ShieldOff, Trash2, Users } from 'lucide-react'
 import { fmt } from '../utils'
 
-const INTERNAL_ROLE_COLORS: Record<string, string> = {
+const ROLE_COLORS: Record<string, string> = {
   ADMIN: 'bg-brand-900/40 text-brand-300 border border-brand-800/40',
   CLIENT: 'bg-gray-800 text-gray-300',
 }
 
 export default function UsersPage() {
   const { user: currentUser } = useAuthStore()
-  const [tab, setTab] = useState<'internal' | 'portal'>('internal')
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(false)
@@ -27,11 +25,6 @@ export default function UsersPage() {
     usersApi.list().then(setUsers).finally(() => setLoading(false)), [])
 
   useEffect(() => { load() }, [load])
-
-  // Internal = staff/admin (no customer link)
-  const internalUsers = users.filter(u => !u.customerId)
-  // Portal = customer portal accounts (linked to a customer)
-  const portalUsers = users.filter(u => !!u.customerId)
 
   const openInvite = () => {
     setForm({ name: '', email: '', role: 'CLIENT' })
@@ -88,65 +81,26 @@ export default function UsersPage() {
 
   if (loading) return <Spinner />
 
-  const displayed = tab === 'internal' ? internalUsers : portalUsers
-
   return (
     <div>
       <PageHeader
-        title="User Management"
-        subtitle={`${internalUsers.length} internal · ${portalUsers.length} portal`}
+        title="Team"
+        subtitle={`${users.length} member${users.length !== 1 ? 's' : ''}`}
         action={
-          tab === 'internal' ? (
-            <button onClick={openInvite} className="btn-primary flex items-center gap-1.5 text-sm">
-              <Plus size={16} /> Add User
-            </button>
-          ) : null
+          <button onClick={openInvite} className="btn-primary flex items-center gap-1.5 text-sm">
+            <Plus size={16} /> Add User
+          </button>
         }
       />
 
-      {/* Tabs */}
-      <div className="px-4 md:px-6 mb-4 grid grid-cols-2 gap-2">
-        <button
-          onClick={() => setTab('internal')}
-          className={`py-2 rounded-xl text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
-            tab === 'internal' ? 'bg-brand-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
-          }`}
-        >
-          <Users size={13} />
-          Internal ({internalUsers.length})
-        </button>
-        <button
-          onClick={() => setTab('portal')}
-          className={`py-2 rounded-xl text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
-            tab === 'portal' ? 'bg-brand-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
-          }`}
-        >
-          <Globe size={13} />
-          Client Portal ({portalUsers.length})
-        </button>
-      </div>
-
       <div className="px-4 md:px-6 space-y-2">
-        {displayed.length === 0 ? (
+        {users.length === 0 ? (
           <div className="card border-dashed text-center py-10">
-            {tab === 'internal' ? (
-              <>
-                <Users size={36} className="text-gray-700 mx-auto mb-3" />
-                <p className="text-gray-500 text-sm">No internal users yet</p>
-                <button onClick={openInvite} className="mt-3 btn-primary text-sm">Add first user</button>
-              </>
-            ) : (
-              <>
-                <Globe size={36} className="text-gray-700 mx-auto mb-3" />
-                <p className="text-gray-500 text-sm">No customers have been invited to the portal yet</p>
-                <p className="text-gray-600 text-xs mt-1">
-                  Open a customer profile and click <strong className="text-gray-500">Invite to Portal</strong>
-                </p>
-              </>
-            )}
+            <Users size={36} className="text-gray-700 mx-auto mb-3" />
+            <p className="text-gray-500 text-sm">No team members yet</p>
           </div>
         ) : (
-          displayed.map(u => {
+          users.map(u => {
             const isSelf = u.id === currentUser?.id
             return (
               <div key={u.id} className={`card ${!u.isActive ? 'opacity-50' : ''}`}>
@@ -162,32 +116,21 @@ export default function UsersPage() {
                       <p className="text-sm font-medium text-white">{u.name}</p>
                       {isSelf && <span className="text-xs text-gray-600">(you)</span>}
                       {!u.isActive && <Badge className="bg-red-900/30 text-red-400">Inactive</Badge>}
-                      {tab === 'portal' && (
-                        <Badge className="bg-emerald-900/30 text-emerald-400">Portal</Badge>
-                      )}
                     </div>
                     <p className="text-xs text-gray-500 truncate">{u.email}</p>
-                    <p className="text-xs text-gray-600 mt-0.5">
-                      {tab === 'portal'
-                        ? `Invited ${fmt.date(u.createdAt)}`
-                        : `Added ${fmt.date(u.createdAt)}`
-                      }
-                    </p>
+                    <p className="text-xs text-gray-600 mt-0.5">Added {fmt.date(u.createdAt)}</p>
                   </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {/* Role selector only for internal users */}
-                    {tab === 'internal' && (
-                      <select
-                        value={u.role}
-                        disabled={isSelf}
-                        onChange={e => changeRole(u.id, e.target.value)}
-                        className={`text-xs rounded-lg px-2 py-1 border-0 outline-none cursor-pointer ${INTERNAL_ROLE_COLORS[u.role]} disabled:cursor-default`}
-                      >
-                        <option value="ADMIN">Admin</option>
-                        <option value="CLIENT">Staff</option>
-                      </select>
-                    )}
+                    <select
+                      value={u.role}
+                      disabled={isSelf}
+                      onChange={e => changeRole(u.id, e.target.value)}
+                      className={`text-xs rounded-lg px-2 py-1 border-0 outline-none cursor-pointer ${ROLE_COLORS[u.role]} disabled:cursor-default`}
+                    >
+                      <option value="ADMIN">Admin</option>
+                      <option value="CLIENT">Staff</option>
+                    </select>
 
                     {!isSelf && (
                       <>
@@ -208,25 +151,12 @@ export default function UsersPage() {
                     )}
                   </div>
                 </div>
-
-                {/* Portal tab: link back to the customer record */}
-                {tab === 'portal' && u.customerId && (
-                  <div className="mt-2 pt-2 border-t border-gray-800">
-                    <Link
-                      to={`/customers/${u.customerId}`}
-                      className="text-xs text-brand-400 hover:text-brand-300 transition-colors"
-                    >
-                      View customer profile →
-                    </Link>
-                  </div>
-                )}
               </div>
             )
           })
         )}
       </div>
 
-      {/* Add Internal User modal */}
       <Modal open={modal} onClose={() => setModal(false)} title="Add Team Member">
         <form onSubmit={invite} className="space-y-4">
           <Field label="Full Name *">
