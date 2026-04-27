@@ -27,12 +27,16 @@ export class UpdateInvestmentDto {
 
 @Injectable()
 export class InvestmentsService {
+  private readonly s: string;
+
   constructor(
     @InjectPinoLogger(InvestmentsService.name)
     private readonly logger: PinoLogger,
     @InjectRepository(Investment) private repo: Repository<Investment>,
     @InjectRepository(Order) private ordersRepo: Repository<Order>,
-  ) {}
+  ) {
+    this.s = process.env.DB_SCHEMA || 'public';
+  }
 
   async findAll(): Promise<Investment[]> {
     this.logger.debug('investments:findAll');
@@ -75,14 +79,14 @@ export class InvestmentsService {
       SELECT
         COALESCE(SUM(CAST(amount AS numeric)), 0) AS total_invested,
         COUNT(*) AS investment_count
-      FROM investments
+      FROM "${this.s}".investments
     `);
 
     const [profitTotals] = await this.ordersRepo.query(`
       SELECT
         COALESCE(SUM(CAST("totalAmount" AS numeric)), 0) AS total_revenue,
         COALESCE(SUM(CAST("totalExpenses" AS numeric)), 0) AS total_expenses
-      FROM orders
+      FROM "${this.s}".orders
       WHERE status = '${OrderStatus.COMPLETED}'
     `);
 
@@ -98,7 +102,7 @@ export class InvestmentsService {
       SELECT
         TO_CHAR(DATE_TRUNC('month', "createdAt"), 'YYYY-MM') AS ym,
         COALESCE(SUM(CAST("totalAmount" AS numeric) - CAST("totalExpenses" AS numeric)), 0) AS profit
-      FROM orders
+      FROM "${this.s}".orders
       WHERE status = '${OrderStatus.COMPLETED}'
       GROUP BY DATE_TRUNC('month', "createdAt")
       ORDER BY ym
@@ -112,7 +116,7 @@ export class InvestmentsService {
 
     const categoryBreakdown = await this.repo.query(`
       SELECT category, COALESCE(SUM(CAST(amount AS numeric)), 0) AS total
-      FROM investments
+      FROM "${this.s}".investments
       GROUP BY category
       ORDER BY total DESC
     `);

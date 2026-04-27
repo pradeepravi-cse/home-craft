@@ -1,11 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
-import { rawMaterialsApi, recipesApi, productsApi, servicesApi, serviceRecipesApi } from '../api/client'
+import { rawMaterialsApi, servicesApi, serviceRecipesApi } from '../api/client'
 import { PageHeader, Empty, Spinner, Modal, Field, ConfirmDialog } from '../components/ui'
 import { fmt } from '../utils'
 import toast from 'react-hot-toast'
 import {
-  Plus, Trash2, Edit2, FlaskConical, Package,
-  ChevronRight, AlertTriangle, Calculator, Layers, Scissors,
+  Plus, Trash2, Edit2, FlaskConical,
+  ChevronRight, AlertTriangle, Scissors,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -242,207 +242,6 @@ function RawMaterialsTab() {
   )
 }
 
-// ─── Recipe Builder Tab (Products) ────────────────────────────────────────────
-
-function RecipesTab() {
-  const [products, setProducts] = useState<any[]>([])
-  const [materials, setMaterials] = useState<any[]>([])
-  const [recipes, setRecipes] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [modal, setModal] = useState(false)
-  const [selectedProduct, setSelectedProduct] = useState<any>(null)
-  const [batchYield, setBatchYield] = useState('1')
-  const [batchDesc, setBatchDesc] = useState('')
-  const [marginPct, setMarginPct] = useState('40')
-  const [lines, setLines] = useState<{ rawMaterialId: string; quantity: string }[]>([])
-  const [preview, setPreview] = useState<any>(null)
-  const [previewLoading, setPreviewLoading] = useState(false)
-  const [deleteProductId, setDeleteProductId] = useState<string | null>(null)
-
-  const load = useCallback(async () => {
-    const [p, m, r] = await Promise.all([productsApi.list(), rawMaterialsApi.list(), recipesApi.all()])
-    setProducts(p); setMaterials(m); setRecipes(r)
-    setLoading(false)
-  }, [])
-
-  useEffect(() => { load() }, [load])
-
-  const openNew = (product?: any) => {
-    setSelectedProduct(product || null)
-    setBatchYield('1'); setBatchDesc(''); setMarginPct('40')
-    setLines([{ rawMaterialId: '', quantity: '' }])
-    setPreview(null)
-    setModal(true)
-  }
-
-  const openEdit = (recipe: any) => {
-    setSelectedProduct(products.find(p => p.id === recipe.productId) || null)
-    setBatchYield(String(recipe.batchYield))
-    setBatchDesc(recipe.batchDescription || '')
-    setMarginPct(String(recipe.targetMarginPct))
-    setLines(recipe.items.map((i: any) => ({ rawMaterialId: i.rawMaterialId, quantity: String(i.quantity) })))
-    setPreview(null)
-    setModal(true)
-  }
-
-  const addLine = () => setLines(l => [...l, { rawMaterialId: '', quantity: '' }])
-  const removeLine = (i: number) => setLines(l => l.filter((_, idx) => idx !== i))
-  const updateLine = (i: number, field: string, value: string) =>
-    setLines(l => l.map((line, idx) => idx === i ? { ...line, [field]: value } : line))
-
-  const buildPayload = () => ({
-    batchDescription: batchDesc || undefined,
-    batchYield: parseFloat(batchYield) || 1,
-    targetMarginPct: parseFloat(marginPct) || 40,
-    items: lines
-      .filter(l => l.rawMaterialId && l.quantity)
-      .map(l => ({ rawMaterialId: l.rawMaterialId, quantity: parseFloat(l.quantity) })),
-  })
-
-  const calcPreview = async () => {
-    const payload = buildPayload()
-    if (!payload.items.length) { toast.error('Add at least one ingredient'); return }
-    setPreviewLoading(true)
-    try {
-      const result = await recipesApi.previewCost(payload)
-      setPreview(result)
-    } catch { toast.error('Failed to calculate') }
-    finally { setPreviewLoading(false) }
-  }
-
-  const save = async () => {
-    if (!selectedProduct) { toast.error('Select a product'); return }
-    const payload = buildPayload()
-    if (!payload.items.length) { toast.error('Add at least one ingredient'); return }
-    try {
-      await recipesApi.save(selectedProduct.id, payload)
-      toast.success('Recipe saved')
-      setModal(false); load()
-    } catch { toast.error('Failed to save recipe') }
-  }
-
-  const delRecipe = async () => {
-    if (!deleteProductId) return
-    try { await recipesApi.delete(deleteProductId); toast.success('Recipe deleted'); load() }
-    catch { toast.error('Failed') }
-    setDeleteProductId(null)
-  }
-
-  if (loading) return <Spinner />
-
-  return (
-    <div className="px-4 space-y-3">
-      <button onClick={() => openNew()} className="btn-primary flex items-center gap-1.5 text-sm w-full justify-center">
-        <Plus size={16} /> New Recipe
-      </button>
-
-      {materials.length === 0 && (
-        <div className="card border-yellow-800/40 bg-yellow-900/10">
-          <p className="text-xs text-yellow-400">Add raw materials first before building recipes.</p>
-        </div>
-      )}
-
-      {recipes.length === 0 ? (
-        <Empty icon={<Layers size={40} />} message="No recipes yet. Create one to calculate costs." />
-      ) : (
-        recipes.map((recipe: any) => (
-          <div key={recipe.id} className="card">
-            <div className="flex items-start justify-between">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <Package size={14} className="text-brand-400 flex-shrink-0" />
-                  <p className="font-medium text-white">{recipe.product?.name}</p>
-                </div>
-                {recipe.batchDescription && (
-                  <p className="text-xs text-gray-500 mt-0.5">{recipe.batchDescription}</p>
-                )}
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Batch yield: {recipe.batchYield} {recipe.product?.unit || 'units'} · {recipe.targetMarginPct}% margin
-                </p>
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {recipe.items?.map((item: any) => (
-                    <span key={item.id} className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full">
-                      {item.rawMaterial?.name}: {item.quantity} {item.rawMaterial?.unit}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div className="flex gap-1 ml-3">
-                <button onClick={() => openEdit(recipe)} className="p-1.5 text-gray-500 hover:text-white bg-gray-800 rounded-lg transition-colors"><Edit2 size={12} /></button>
-                <button onClick={() => setDeleteProductId(recipe.productId)} className="p-1.5 text-gray-500 hover:text-red-400 bg-gray-800 rounded-lg transition-colors"><Trash2 size={12} /></button>
-              </div>
-            </div>
-          </div>
-        ))
-      )}
-
-      {/* Recipe builder modal */}
-      <Modal open={modal} onClose={() => { setModal(false); setPreview(null) }} title="Recipe Builder">
-        <div className="space-y-4">
-          <Field label="Product *">
-            <select className="input" value={selectedProduct?.id || ''} onChange={e => setSelectedProduct(products.find(p => p.id === e.target.value) || null)}>
-              <option value="">Select product…</option>
-              {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </Field>
-
-          <Field label="Batch Description">
-            <input className="input" value={batchDesc} onChange={e => setBatchDesc(e.target.value)} placeholder="e.g. 300g box of 10 cookies" />
-          </Field>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Batch Yield (units)">
-              <input type="number" step="0.01" className="input" value={batchYield} onChange={e => setBatchYield(e.target.value)} placeholder="1" />
-            </Field>
-            <Field label="Target Margin %">
-              <input type="number" step="1" className="input" value={marginPct} onChange={e => setMarginPct(e.target.value)} placeholder="40" />
-            </Field>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-gray-300">Ingredients</p>
-              <button onClick={addLine} className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">
-                <Plus size={12} /> Add
-              </button>
-            </div>
-            <div className="space-y-2">
-              {lines.map((line, i) => (
-                <div key={i} className="flex gap-2 items-center">
-                  <select className="input flex-1 text-xs" value={line.rawMaterialId}
-                    onChange={e => updateLine(i, 'rawMaterialId', e.target.value)}>
-                    <option value="">Select material…</option>
-                    {materials.filter(m => m.category !== 'OVERHEAD').map(m => (
-                      <option key={m.id} value={m.id}>{m.name} ({m.unit})</option>
-                    ))}
-                  </select>
-                  <input type="number" step="0.001" className="input w-24 text-xs" placeholder="Qty"
-                    value={line.quantity} onChange={e => updateLine(i, 'quantity', e.target.value)} />
-                  <button onClick={() => removeLine(i)} className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <button onClick={calcPreview} disabled={previewLoading}
-            className="flex items-center justify-center gap-2 w-full py-2 rounded-xl border border-brand-700/50 text-brand-400 text-sm hover:bg-brand-900/20 transition-colors">
-            <Calculator size={14} />
-            {previewLoading ? 'Calculating…' : 'Preview Cost'}
-          </button>
-
-          {preview && <CostCard result={preview} selectedProduct={selectedProduct} />}
-
-          <button onClick={save} className="btn-primary w-full">Save Recipe</button>
-        </div>
-      </Modal>
-
-      <ConfirmDialog open={Boolean(deleteProductId)} onClose={() => setDeleteProductId(null)} onConfirm={delRecipe}
-        title="Delete Recipe" message="Remove this recipe? The product won't be deleted." danger />
-    </div>
-  )
-}
 
 // ─── Service Costs Tab ────────────────────────────────────────────────────────
 
@@ -645,127 +444,6 @@ function ServiceCostsTab() {
   )
 }
 
-// ─── Cost Analysis Tab (Products) ─────────────────────────────────────────────
-
-function CostBreakdownTab() {
-  const [products, setProducts] = useState<any[]>([])
-  const [recipes, setRecipes] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [expanded, setExpanded] = useState<string | null>(null)
-  const [costs, setCosts] = useState<Record<string, any>>({})
-  const [loadingCost, setLoadingCost] = useState<string | null>(null)
-
-  useEffect(() => {
-    Promise.all([productsApi.list(), recipesApi.all()])
-      .then(([p, r]) => { setProducts(p); setRecipes(r) })
-      .finally(() => setLoading(false))
-  }, [])
-
-  const recipeMap = new Map(recipes.map((r: any) => [r.productId, r]))
-
-  const loadCost = async (productId: string) => {
-    if (costs[productId]) { setExpanded(expanded === productId ? null : productId); return }
-    setLoadingCost(productId)
-    try {
-      const result = await recipesApi.cost(productId)
-      setCosts(prev => ({ ...prev, [productId]: result }))
-      setExpanded(productId)
-    } catch { toast.error('Failed to load cost') }
-    finally { setLoadingCost(null) }
-  }
-
-  if (loading) return <Spinner />
-
-  const productsWithRecipes = products.filter(p => recipeMap.has(p.id))
-
-  return (
-    <div className="px-4 space-y-2">
-      {productsWithRecipes.length === 0 ? (
-        <Empty icon={<Calculator size={40} />} message="No recipes yet. Build a recipe in the Recipes tab." />
-      ) : (
-        productsWithRecipes.map(product => {
-          const cost = costs[product.id]
-          const isOpen = expanded === product.id
-          const isLoading = loadingCost === product.id
-
-          return (
-            <div key={product.id} className="card">
-              <button onClick={() => loadCost(product.id)} className="w-full flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Package size={14} className="text-brand-400 flex-shrink-0" />
-                  <span className="font-medium text-white text-sm">{product.name}</span>
-                </div>
-                <div className="flex items-center gap-2 ml-3">
-                  {isLoading && <Spinner />}
-                  {cost && !isLoading && (
-                    <span className="text-xs text-gray-400">
-                      Cost: <span className="text-white font-medium">{fmt.currency(cost.costPerUnit)}</span>
-                      {' · '}
-                      Price: <span className="text-brand-300 font-medium">{fmt.currency(cost.suggestedPrice)}</span>
-                    </span>
-                  )}
-                  <ChevronRight size={14} className={`text-gray-500 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
-                </div>
-              </button>
-
-              {isOpen && cost && (
-                <div className="mt-3 pt-3 border-t border-gray-800">
-                  <CostCard result={cost} selectedProduct={product} />
-                </div>
-              )}
-            </div>
-          )
-        })
-      )}
-    </div>
-  )
-}
-
-// ─── Shared Cost Cards ─────────────────────────────────────────────────────────
-
-function CostCard({ result, selectedProduct }: { result: any; selectedProduct: any }) {
-  return (
-    <div className="rounded-xl bg-gray-800/60 border border-gray-700/40 p-3 space-y-3">
-      <div>
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Cost Breakdown</p>
-        <div className="space-y-1">
-          {result.lines?.map((line: any) => (
-            <div key={line.rawMaterialId} className="flex items-center justify-between text-xs">
-              <span className="text-gray-300">{line.name}</span>
-              <span className="text-gray-500">{line.quantity} {line.unit} × {fmt.currency(line.costPerUnit)}</span>
-              <span className="text-white font-medium ml-2">{fmt.currency(line.lineCost)}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="border-t border-gray-700/50 pt-2 space-y-1.5">
-        <div className="flex justify-between text-xs text-gray-400">
-          <span>Batch cost ({result.batchYield} units)</span>
-          <span className="text-white">{fmt.currency(result.totalBatchCost)}</span>
-        </div>
-        <div className="flex justify-between text-xs text-gray-400">
-          <span>Landed cost / unit</span>
-          <span className="text-white font-medium">{fmt.currency(result.costPerUnit)}</span>
-        </div>
-        <div className="flex justify-between text-sm font-semibold border-t border-gray-700/50 pt-1.5">
-          <span className="text-gray-300">Suggested price ({result.targetMarginPct}% margin)</span>
-          <span className="text-brand-300">{fmt.currency(result.suggestedPrice)}</span>
-        </div>
-        {selectedProduct?.price > 0 && (
-          <div className="flex justify-between text-xs text-gray-500">
-            <span>Current selling price</span>
-            <span className={Number(selectedProduct.price) >= result.suggestedPrice ? 'text-emerald-400' : 'text-yellow-400'}>
-              {fmt.currency(selectedProduct.price)}
-              {' '}
-              ({Number(selectedProduct.price) >= result.suggestedPrice ? '✓ above target' : '⚠ below target'})
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 function ServiceCostCard({ result, service }: { result: any; service: any }) {
   return (
     <div className="rounded-xl bg-gray-800/60 border border-gray-700/40 p-3 space-y-3">
@@ -810,22 +488,20 @@ function ServiceCostCard({ result, service }: { result: any; service: any }) {
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function RecipesPage() {
-  const [tab, setTab] = useState<'materials' | 'recipes' | 'services' | 'costs'>('materials')
+  const [tab, setTab] = useState<'materials' | 'services'>('materials')
 
   return (
     <div className="pb-6">
       <PageHeader
         title="Recipes & Costs"
-        subtitle="Raw materials, recipes, landed cost"
+        subtitle="Raw materials and service costs"
       />
 
       {/* Tabs */}
-      <div className="px-4 mb-4 grid grid-cols-4 gap-1.5">
+      <div className="px-4 mb-4 grid grid-cols-2 gap-1.5">
         {([
           ['materials', 'Materials'],
-          ['recipes', 'Products'],
-          ['services', 'Services'],
-          ['costs', 'Analysis'],
+          ['services', 'Service Costs'],
         ] as const).map(([key, label]) => (
           <button
             key={key}
@@ -840,9 +516,7 @@ export default function RecipesPage() {
       </div>
 
       {tab === 'materials' && <RawMaterialsTab />}
-      {tab === 'recipes' && <RecipesTab />}
       {tab === 'services' && <ServiceCostsTab />}
-      {tab === 'costs' && <CostBreakdownTab />}
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { User, UserRole } from './user.entity';
 
@@ -63,5 +64,58 @@ export class UsersService {
 
   count(): Promise<number> {
     return this.usersRepo.count();
+  }
+
+  findByResetToken(token: string): Promise<User | null> {
+    return this.usersRepo.findOne({ where: { resetToken: token } });
+  }
+
+  async updatePassword(id: string, hashedPassword: string): Promise<void> {
+    this.logger.info({ id }, 'users:updatePassword');
+    await this.usersRepo.update(id, { password: hashedPassword, resetToken: null, resetTokenExpiry: null });
+  }
+
+  async saveResetToken(id: string, token: string, expiry: Date): Promise<void> {
+    this.logger.info({ id }, 'users:saveResetToken');
+    await this.usersRepo.update(id, { resetToken: token, resetTokenExpiry: expiry });
+  }
+
+  async clearResetToken(id: string): Promise<void> {
+    this.logger.info({ id }, 'users:clearResetToken');
+    await this.usersRepo.update(id, { resetToken: null, resetTokenExpiry: null });
+  }
+
+  async delete(id: string): Promise<void> {
+    this.logger.info({ id }, 'users:delete');
+    await this.usersRepo.delete(id);
+  }
+
+  async createInvited(email: string, name: string, role: UserRole): Promise<{ user: User; token: string }> {
+    this.logger.info({ role }, 'users:createInvited');
+    // Random unusable password — user sets their own via invite link
+    const hashed = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    const user = this.usersRepo.create({
+      email, name, role,
+      password: hashed,
+      isActive: false, // inactive until they accept the invite
+      resetToken: token,
+      resetTokenExpiry: expiry,
+    });
+    const saved = await this.usersRepo.save(user);
+    this.logger.info({ id: saved.id, role }, 'users:invited created');
+    return { user: saved, token };
+  }
+
+  async activateFromInvite(id: string, hashedPassword: string): Promise<void> {
+    this.logger.info({ id }, 'users:activateFromInvite');
+    await this.usersRepo.update(id, {
+      password: hashedPassword,
+      isActive: true,
+      resetToken: null,
+      resetTokenExpiry: null,
+    });
   }
 }

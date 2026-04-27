@@ -5,13 +5,17 @@ import { useAuthStore } from './store/auth'
 import { useThemeStore } from './store/theme'
 import AppLayout from './components/layout/AppLayout'
 import LoginPage from './pages/Login'
+import ForgotPasswordPage from './pages/ForgotPassword'
+import ResetPasswordPage from './pages/ResetPassword'
+import AcceptInvitePage from './pages/AcceptInvite'
+import ChangePasswordPage from './pages/ChangePassword'
 import Dashboard from './pages/Dashboard'
 import { CustomersPage, CustomerFormPage, CustomerDetailPage } from './pages/Customers'
 import { OrdersPage, NewOrderPage, OrderDetailPage } from './pages/Orders'
 import EarningsPage from './pages/Earnings'
-import ProductsPage from './pages/Products'
 import ServicesPage from './pages/Services'
 import RecipesPage from './pages/Recipes'
+import UsersPage from './pages/Users'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { token } = useAuthStore()
@@ -42,6 +46,9 @@ export default function App() {
       />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/accept-invite" element={<AcceptInvitePage />} />
         <Route path="/" element={<RequireAuth><Dashboard /></RequireAuth>} />
 
         {/* Customers */}
@@ -63,7 +70,8 @@ export default function App() {
 
         {/* Other */}
         <Route path="/earnings" element={<RequireAuth><EarningsPage /></RequireAuth>} />
-        <Route path="/products" element={<RequireAuth><ProductsPage /></RequireAuth>} />
+        <Route path="/users" element={<RequireAuth><UsersPage /></RequireAuth>} />
+        <Route path="/change-password" element={<RequireAuth><ChangePasswordPage /></RequireAuth>} />
 
         {/* Legacy redirects */}
         <Route path="/clients" element={<Navigate to="/customers" replace />} />

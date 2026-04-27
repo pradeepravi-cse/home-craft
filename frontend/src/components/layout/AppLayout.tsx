@@ -1,20 +1,21 @@
 import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, ShoppingBag, TrendingUp,
-  Package, Scissors, LogOut, Menu, X, FlaskConical, Sun, Moon,
+  Scissors, LogOut, Menu, X, FlaskConical, Sun, Moon, KeyRound, UserCog,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuthStore } from '../../store/auth'
 import { useThemeStore } from '../../store/theme'
+import { APP_NAME, APP_TAGLINE } from '../../config'
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/customers', icon: Users, label: 'Customers' },
   { path: '/orders', icon: ShoppingBag, label: 'Orders' },
   { path: '/services', icon: Scissors, label: 'Services' },
-  { path: '/products', icon: Package, label: 'Products' },
   { path: '/recipes', icon: FlaskConical, label: 'Recipes' },
   { path: '/earnings', icon: TrendingUp, label: 'Earnings' },
+  { path: '/users', icon: UserCog, label: 'Team' },
 ]
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -32,9 +33,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <aside className="hidden md:flex md:flex-col md:w-60 md:shrink-0 md:fixed md:inset-y-0 md:left-0 md:z-40 border-r border-gray-800 bg-gray-900">
         {/* Brand */}
         <div className="px-5 py-5 border-b border-gray-800">
-          <h1 className="font-display text-lg font-bold text-brand-400 leading-tight">Preethys'</h1>
-          <p className="font-display text-base font-semibold text-white leading-tight">Business</p>
-          <p className="text-xs text-gray-500 mt-0.5">Business Manager</p>
+          <h1 className="font-display text-lg font-bold text-brand-400 leading-tight">{APP_NAME}</h1>
+          <p className="text-xs text-gray-500 mt-0.5">{APP_TAGLINE}</p>
         </div>
 
         {/* Nav */}
@@ -63,9 +63,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <p className="text-xs text-gray-500 truncate">{user?.email}</p>
           <p className="text-sm font-medium text-white truncate">{user?.name}</p>
           <p className="text-xs text-brand-500 capitalize mt-0.5">{user?.role?.toLowerCase()}</p>
+          <Link
+            to="/change-password"
+            className="flex items-center gap-2 mt-3 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+          >
+            <KeyRound size={14} />
+            Change Password
+          </Link>
           <button
             onClick={() => logout()}
-            className="flex items-center gap-2 mt-3 text-xs text-red-400 hover:text-red-300 transition-colors"
+            className="flex items-center gap-2 mt-2 text-xs text-red-400 hover:text-red-300 transition-colors"
           >
             <LogOut size={14} />
             Sign Out
@@ -78,8 +85,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Mobile header */}
         <header className="md:hidden sticky top-0 z-40 bg-gray-950/95 backdrop-blur border-b border-gray-800 px-4 py-3 flex items-center justify-between">
           <div>
-            <h1 className="font-display text-lg font-bold text-brand-400 leading-none">Preethys' Business</h1>
-            <p className="text-xs text-gray-500">Business Manager</p>
+            <h1 className="font-display text-lg font-bold text-brand-400 leading-none">{APP_NAME}</h1>
+            <p className="text-xs text-gray-500">{APP_TAGLINE}</p>
           </div>
           <div className="flex items-center gap-1">
             <button

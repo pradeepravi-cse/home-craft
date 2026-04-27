@@ -4,9 +4,9 @@ import { StatCard, Spinner, Modal, Field, ConfirmDialog } from '../components/ui
 import { fmt } from '../utils'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
-  PieChart, Pie, Cell, LineChart, Line, ReferenceLine,
+  LineChart, Line, ReferenceLine,
 } from 'recharts'
-import { Scissors, Package, Plus, Trash2, Edit2, TrendingUp, Settings } from 'lucide-react'
+import { Scissors, Plus, Trash2, Edit2, TrendingUp, Settings } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const COLORS = ['#c026d3', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6']
@@ -26,8 +26,6 @@ const INV_CAT_LABELS: Record<string, string> = {
 function OverviewTab({ year, onYearChange }: { year: number; onYearChange: (y: number) => void }) {
   const [summary, setSummary] = useState<any>(null)
   const [monthly, setMonthly] = useState<any[]>([])
-  const [businessLine, setBusinessLine] = useState<any>(null)
-  const [topProducts, setTopProducts] = useState<any[]>([])
   const [topServices, setTopServices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -36,22 +34,13 @@ function OverviewTab({ year, onYearChange }: { year: number; onYearChange: (y: n
     Promise.all([
       earningsApi.summary(),
       earningsApi.monthly(year),
-      earningsApi.byBusinessLine(),
-      earningsApi.topProducts(5),
       earningsApi.topServices(5),
-    ]).then(([s, m, bl, tp, ts]) => {
-      setSummary(s); setMonthly(m); setBusinessLine(bl)
-      setTopProducts(tp); setTopServices(ts)
+    ]).then(([s, m, ts]) => {
+      setSummary(s); setMonthly(m); setTopServices(ts)
     }).finally(() => setLoading(false))
   }, [year])
 
   if (loading) return <Spinner />
-
-  const totalRevenue = (businessLine?.products?.revenue || 0) + (businessLine?.services?.revenue || 0)
-  const splitData = [
-    { name: 'Services', value: businessLine?.services?.revenue || 0 },
-    { name: 'Products', value: businessLine?.products?.revenue || 0 },
-  ].filter(d => d.value > 0)
 
   return (
     <div className="space-y-5">
@@ -62,44 +51,6 @@ function OverviewTab({ year, onYearChange }: { year: number; onYearChange: (y: n
         <StatCard label="This Month" value={fmt.currency(summary?.thisMonth?.revenue || 0)} sub="Revenue" color="gold" />
         <StatCard label="This Month" value={fmt.currency(summary?.thisMonth?.profit || 0)} sub="Profit" color="blue" />
       </div>
-
-      {/* Revenue split */}
-      {totalRevenue > 0 && (
-        <div className="px-4">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Revenue by Business Line</h2>
-          <div className="card flex items-center gap-4">
-            <PieChart width={120} height={120}>
-              <Pie data={splitData} dataKey="value" cx={55} cy={55} innerRadius={30} outerRadius={55}>
-                {splitData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Pie>
-            </PieChart>
-            <div className="flex-1 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full bg-brand-500" />
-                  <Scissors size={12} className="text-brand-400" />
-                  <span className="text-sm text-gray-300">Services</span>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-white">{fmt.currency(businessLine?.services?.revenue || 0)}</p>
-                  <p className="text-xs text-gray-500">{businessLine?.services?.orderCount || 0} orders</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                  <Package size={12} className="text-amber-400" />
-                  <span className="text-sm text-gray-300">Products</span>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-white">{fmt.currency(businessLine?.products?.revenue || 0)}</p>
-                  <p className="text-xs text-gray-500">{businessLine?.products?.orderCount || 0} orders</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Monthly chart */}
       <div className="px-4">
@@ -139,26 +90,6 @@ function OverviewTab({ year, onYearChange }: { year: number; onYearChange: (y: n
                 <div className="text-right">
                   <p className="text-sm font-medium text-white">{fmt.currency(parseFloat(s.revenue))}</p>
                   <p className="text-xs text-gray-500">{s.count} times</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Top Products */}
-      {topProducts.length > 0 && (
-        <div className="px-4">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Top Products</h2>
-          <div className="card divide-y divide-gray-800">
-            {topProducts.map((p: any, i: number) => (
-              <div key={p.productId} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                <span className="text-xs text-gray-600 w-4">{i + 1}</span>
-                <Package size={13} className="text-amber-400 flex-shrink-0" />
-                <span className="flex-1 text-sm text-white truncate">{p.name}</span>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-white">{fmt.currency(parseFloat(p.revenue))}</p>
-                  <p className="text-xs text-gray-500">{p.units_sold} sold</p>
                 </div>
               </div>
             ))}

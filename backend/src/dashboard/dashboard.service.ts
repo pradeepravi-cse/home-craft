@@ -9,6 +9,8 @@ import { Investment } from '../investments/investment.entity';
 
 @Injectable()
 export class DashboardService {
+  private readonly s: string;
+
   constructor(
     @InjectPinoLogger(DashboardService.name)
     private readonly logger: PinoLogger,
@@ -16,7 +18,9 @@ export class DashboardService {
     @InjectRepository(OrderItem) private itemsRepo: Repository<OrderItem>,
     @InjectRepository(Customer) private customersRepo: Repository<Customer>,
     @InjectRepository(Investment) private investmentsRepo: Repository<Investment>,
-  ) {}
+  ) {
+    this.s = process.env.DB_SCHEMA || 'public';
+  }
 
   async getOverview(): Promise<any> {
     this.logger.debug('dashboard:getOverview');
@@ -42,7 +46,7 @@ export class DashboardService {
         SELECT
           COALESCE(SUM(CAST("totalAmount" AS numeric)), 0) AS total_revenue,
           COALESCE(SUM(CAST("totalExpenses" AS numeric)), 0) AS total_expenses
-        FROM orders
+        FROM "${this.s}".orders
         WHERE status = '${OrderStatus.COMPLETED}'
           AND DATE_TRUNC('month', "createdAt") = DATE_TRUNC('month', CURRENT_DATE)
       `),
@@ -53,14 +57,14 @@ export class DashboardService {
         take: 5,
       }),
       this.ordersRepo.query(`
-        SELECT status, COUNT(*) AS count FROM orders GROUP BY status
+        SELECT status, COUNT(*) AS count FROM "${this.s}".orders GROUP BY status
       `),
       this.itemsRepo.query(`
         SELECT
           oi.type,
           COALESCE(SUM(CAST(oi.subtotal AS numeric)), 0) AS revenue
-        FROM order_items oi
-        INNER JOIN orders o ON o.id = oi.order_id
+        FROM "${this.s}".order_items oi
+        INNER JOIN "${this.s}".orders o ON o.id = oi.order_id
         WHERE o.status = '${OrderStatus.COMPLETED}'
         GROUP BY oi.type
       `),
@@ -68,7 +72,7 @@ export class DashboardService {
         SELECT
           COALESCE(SUM(CAST("totalAmount" AS numeric)), 0) AS total_revenue,
           COALESCE(SUM(CAST("totalExpenses" AS numeric)), 0) AS total_expenses
-        FROM orders
+        FROM "${this.s}".orders
         WHERE status = '${OrderStatus.COMPLETED}'
       `),
     ]);
@@ -76,7 +80,7 @@ export class DashboardService {
     let totalInvested = 0;
     try {
       const [invResult] = await this.investmentsRepo.query(
-        `SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) AS total_invested FROM investments`,
+        `SELECT COALESCE(SUM(CAST(amount AS numeric)), 0) AS total_invested FROM "${this.s}".investments`,
       );
       totalInvested = parseFloat(invResult.total_invested) || 0;
     } catch (_) {
