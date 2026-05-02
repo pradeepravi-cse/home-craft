@@ -16,6 +16,11 @@ export class CustomersController {
     return this.customersService.findAll(search);
   }
 
+  @Get(':id/referral-stats')
+  getReferralStats(@Param('id') id: string) {
+    return this.customersService.getReferralStats(id);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.customersService.findOne(id);

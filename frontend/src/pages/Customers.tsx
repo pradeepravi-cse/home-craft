@@ -4,7 +4,10 @@ import { customersApi, measurementsApi, ordersApi } from '../api/client'
 import { PageHeader, Empty, Spinner, Badge, Modal, Field, ConfirmDialog } from '../components/ui'
 import { fmt, STATUS_COLORS, STATUS_LABELS } from '../utils'
 import toast from 'react-hot-toast'
-import { Plus, User, Phone, Trash2, Edit2, Ruler, ShoppingBag, ChevronRight } from 'lucide-react'
+import {
+  Plus, User, Phone, Trash2, Edit2, Ruler, ShoppingBag, ChevronRight,
+  Crown, Gift, Users, BarChart2,
+} from 'lucide-react'
 
 // ─── Customer List ────────────────────────────────────────────────────────────
 export function CustomersPage() {
@@ -51,13 +54,28 @@ export function CustomersPage() {
         <div className="px-4 space-y-2">
           {customers.map(c => (
             <Link key={c.id} to={`/customers/${c.id}`} className="card flex items-center gap-3 hover:border-gray-700 transition-colors">
-              <div className="w-10 h-10 rounded-full bg-brand-900/40 border border-brand-800/50 flex items-center justify-center text-brand-300 font-display font-bold text-lg flex-shrink-0">
-                {c.name[0].toUpperCase()}
+              <div className="relative w-10 h-10 flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-brand-900/40 border border-brand-800/50 flex items-center justify-center text-brand-300 font-display font-bold text-lg">
+                  {c.name[0].toUpperCase()}
+                </div>
+                {c.isPrivileged && (
+                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center">
+                    <Crown size={9} className="text-white" />
+                  </div>
+                )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-white truncate">{c.name}</p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="font-medium text-white truncate">{c.name}</p>
+                  {c.referralBenefitPending && (
+                    <span className="flex items-center gap-0.5 text-xs bg-emerald-900/40 text-emerald-400 px-1.5 py-0.5 rounded-full border border-emerald-800/50">
+                      <Gift size={9} /> Benefit
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-gray-500">
                   {c.nickname ? `"${c.nickname}" · ` : ''}{c.phone || 'No phone'}
+                  {c.referredBy ? ` · via ${c.referredBy.name}` : ''}
                 </p>
               </div>
               <div className="flex flex-col items-end gap-1">
@@ -77,16 +95,24 @@ export function CustomerFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const isEdit = Boolean(id)
-  const [form, setForm] = useState({ name: '', nickname: '', phone: '', notes: '' })
+  const [form, setForm] = useState({ name: '', nickname: '', phone: '', notes: '', referredById: '' })
+  const [allCustomers, setAllCustomers] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (isEdit) customersApi.get(id!).then(c => setForm({
-      name: c.name,
-      nickname: c.nickname || '',
-      phone: c.phone || '',
-      notes: c.notes || '',
-    }))
+    customersApi.list().then(list => {
+      // Exclude self when editing
+      setAllCustomers(list.filter((c: any) => c.id !== id))
+    })
+    if (isEdit) {
+      customersApi.get(id!).then(c => setForm({
+        name: c.name,
+        nickname: c.nickname || '',
+        phone: c.phone || '',
+        notes: c.notes || '',
+        referredById: c.referredById || '',
+      }))
+    }
   }, [id])
 
   const submit = async (e: React.FormEvent) => {
@@ -96,6 +122,7 @@ export function CustomerFormPage() {
     if (form.nickname) payload.nickname = form.nickname
     if (form.phone) payload.phone = form.phone
     if (form.notes) payload.notes = form.notes
+    if (!isEdit && form.referredById) payload.referredById = form.referredById
     try {
       if (isEdit) {
         await customersApi.update(id!, payload)
@@ -133,6 +160,22 @@ export function CustomerFormPage() {
             onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
             placeholder="Any special notes…" />
         </Field>
+        {!isEdit && (
+          <Field label="Referred by (optional)">
+            <select className="input" value={form.referredById}
+              onChange={e => setForm(f => ({ ...f, referredById: e.target.value }))}>
+              <option value="">— No referral —</option>
+              {allCustomers.map(c => (
+                <option key={c.id} value={c.id}>{c.name}{c.nickname ? ` (${c.nickname})` : ''}</option>
+              ))}
+            </select>
+            {form.referredById && (
+              <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
+                <Gift size={11} /> This customer will receive 1 free saree pleating benefit.
+              </p>
+            )}
+          </Field>
+        )}
         <button type="submit" disabled={saving} className="btn-primary w-full">
           {saving ? 'Saving…' : 'Save Customer'}
         </button>
@@ -157,6 +200,9 @@ export function CustomerDetailPage() {
   })
   const [editMeasurement, setEditMeasurement] = useState<any>(null)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [togglingPrivilege, setTogglingPrivilege] = useState(false)
+  const [togglingBenefit, setTogglingBenefit] = useState(false)
+
   const load = async () => {
     const [c, o, m] = await Promise.all([
       customersApi.get(id!),
@@ -168,6 +214,27 @@ export function CustomerDetailPage() {
   }
 
   useEffect(() => { load() }, [id])
+
+  const togglePrivilege = async () => {
+    setTogglingPrivilege(true)
+    try {
+      await customersApi.update(id!, { isPrivileged: !customer.isPrivileged })
+      toast.success(customer.isPrivileged ? 'Removed privileged status' : 'Marked as privileged')
+      load()
+    } catch { toast.error('Failed to update') } finally { setTogglingPrivilege(false) }
+  }
+
+  const markBenefitUsed = async () => {
+    setTogglingBenefit(true)
+    try {
+      await customersApi.update(id!, {
+        referralBenefitPending: false,
+        referralBenefitUsedAt: new Date().toISOString(),
+      })
+      toast.success('Referral benefit marked as used')
+      load()
+    } catch { toast.error('Failed to update') } finally { setTogglingBenefit(false) }
+  }
 
   const openAddMeasurement = () => {
     setEditMeasurement(null)
@@ -219,11 +286,23 @@ export function CustomerDetailPage() {
     <div>
       <div className="px-4 pt-5 pb-3 flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-brand-900/40 border border-brand-800/50 flex items-center justify-center text-brand-300 font-display font-bold text-xl">
-            {customer.name[0].toUpperCase()}
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full bg-brand-900/40 border border-brand-800/50 flex items-center justify-center text-brand-300 font-display font-bold text-xl">
+              {customer.name[0].toUpperCase()}
+            </div>
+            {customer.isPrivileged && (
+              <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+                <Crown size={11} className="text-white" />
+              </div>
+            )}
           </div>
           <div>
-            <h1 className="font-display text-xl font-bold text-white">{customer.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="font-display text-xl font-bold text-white">{customer.name}</h1>
+              {customer.isPrivileged && (
+                <Badge className="bg-amber-900/40 text-amber-300 border border-amber-800/40">Privileged</Badge>
+              )}
+            </div>
             {customer.phone && <p className="text-xs text-gray-500">{customer.phone}</p>}
           </div>
         </div>
@@ -232,6 +311,31 @@ export function CustomerDetailPage() {
           <button onClick={() => setDeleteConfirm(true)} className="btn-danger p-2.5"><Trash2 size={16} /></button>
         </div>
       </div>
+
+      {/* Referral benefit banner */}
+      {customer.referralBenefitPending && (
+        <div className="mx-4 mb-3 rounded-xl bg-emerald-900/20 border border-emerald-800/50 px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Gift size={16} className="text-emerald-400 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-emerald-300">Referral Benefit Pending</p>
+              <p className="text-xs text-emerald-600">1 free saree pleating — not yet used</p>
+            </div>
+          </div>
+          <button
+            onClick={markBenefitUsed}
+            disabled={togglingBenefit}
+            className="text-xs bg-emerald-800/40 hover:bg-emerald-700/40 text-emerald-300 px-3 py-1.5 rounded-lg transition-colors flex-shrink-0">
+            Mark Used
+          </button>
+        </div>
+      )}
+      {customer.referralBenefitUsedAt && !customer.referralBenefitPending && (
+        <div className="mx-4 mb-3 rounded-xl bg-gray-800/40 border border-gray-700/40 px-4 py-2.5 flex items-center gap-2">
+          <Gift size={14} className="text-gray-500" />
+          <p className="text-xs text-gray-500">Referral benefit used on {fmt.date(customer.referralBenefitUsedAt)}</p>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="px-4 mb-4 grid grid-cols-3 gap-2">
@@ -249,6 +353,27 @@ export function CustomerDetailPage() {
         </div>
       </div>
 
+      {/* Actions */}
+      <div className="px-4 mb-4 grid grid-cols-2 gap-2">
+        <button
+          onClick={togglePrivilege}
+          disabled={togglingPrivilege}
+          className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+            customer.isPrivileged
+              ? 'bg-amber-900/30 border-amber-700/50 text-amber-300 hover:bg-amber-900/50'
+              : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
+          }`}>
+          <Crown size={14} />
+          {customer.isPrivileged ? 'Privileged' : 'Mark Privileged'}
+        </button>
+        <Link
+          to={`/customers/${id}/360`}
+          className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium border bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700 transition-colors">
+          <BarChart2 size={14} />
+          View 360
+        </Link>
+      </div>
+
       {/* Contact */}
       <div className="px-4 mb-4">
         <div className="card space-y-2">
@@ -264,6 +389,26 @@ export function CustomerDetailPage() {
             </a>
           ) : (
             <p className="text-xs text-gray-600">No phone number</p>
+          )}
+          {customer.referredBy && (
+            <div className="flex items-center gap-2 pt-1 border-t border-gray-800">
+              <Users size={12} className="text-gray-500 flex-shrink-0" />
+              <p className="text-xs text-gray-500">
+                Referred by{' '}
+                <Link to={`/customers/${customer.referredBy.id}`} className="text-brand-400 hover:text-brand-300">
+                  {customer.referredBy.name}
+                </Link>
+              </p>
+            </div>
+          )}
+          {customer.referrals?.length > 0 && (
+            <div className="flex items-center gap-2 pt-1 border-t border-gray-800">
+              <Gift size={12} className="text-gray-500 flex-shrink-0" />
+              <p className="text-xs text-gray-500">
+                Referred {customer.referrals.length} customer{customer.referrals.length !== 1 ? 's' : ''} ·{' '}
+                <Link to={`/customers/${id}/360`} className="text-brand-400 hover:text-brand-300">view network</Link>
+              </p>
+            </div>
           )}
           {customer.notes && <p className="text-xs text-gray-500 pt-1 border-t border-gray-800">{customer.notes}</p>}
         </div>
