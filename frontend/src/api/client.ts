@@ -55,6 +55,7 @@ export const customersApi = {
   create: (data: any) => api.post('/customers', data).then(r => r.data),
   update: (id: string, data: any) => api.patch(`/customers/${id}`, data).then(r => r.data),
   delete: (id: string) => api.delete(`/customers/${id}`).then(r => r.data),
+  referralStats: (id: string) => api.get(`/customers/${id}/referral-stats`).then(r => r.data),
 }
 
 // Measurements

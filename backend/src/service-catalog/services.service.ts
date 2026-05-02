@@ -2,11 +2,11 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
-  IsString, IsOptional, IsBoolean, IsNumber, ValidateNested,
+  IsString, IsOptional, IsBoolean, IsNumber, ValidateNested, IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
-import { Service, WorkflowDefinition } from './service.entity';
+import { Service, WorkflowDefinition, CustomerTier } from './service.entity';
 
 class WorkflowStepDto {
   @IsString() id: string;
@@ -31,6 +31,7 @@ export class CreateServiceDto {
   @IsOptional() @IsBoolean() isOptional?: boolean;
   @ValidateNested() @Type(() => WorkflowDefinitionDto) workflowDefinition: WorkflowDefinitionDto;
   @IsOptional() @IsBoolean() isActive?: boolean;
+  @IsOptional() @IsEnum(CustomerTier) customerTier?: CustomerTier;
 }
 
 export class UpdateServiceDto {
@@ -40,6 +41,7 @@ export class UpdateServiceDto {
   @IsOptional() @IsBoolean() isOptional?: boolean;
   @IsOptional() @ValidateNested() @Type(() => WorkflowDefinitionDto) workflowDefinition?: WorkflowDefinitionDto;
   @IsOptional() @IsBoolean() isActive?: boolean;
+  @IsOptional() @IsEnum(CustomerTier) customerTier?: CustomerTier;
 }
 
 @Injectable()

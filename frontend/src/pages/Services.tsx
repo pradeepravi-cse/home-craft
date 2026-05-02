@@ -5,7 +5,7 @@ import { fmt } from '../utils'
 import toast from 'react-hot-toast'
 import {
   Plus, Scissors, Edit2, Trash2, CheckCircle, XCircle, Lock, Unlock,
-  ArrowUp, ArrowDown,
+  ArrowUp, ArrowDown, Crown, Users,
 } from 'lucide-react'
 
 // ─── Workflow Step Builder ─────────────────────────────────────────────────────
@@ -135,6 +135,7 @@ function ServiceModal({
   const isEdit = Boolean(service)
   const [form, setForm] = useState({
     name: '', description: '', basePrice: '', isOptional: false, isActive: true,
+    customerTier: 'ALL' as 'ALL' | 'PRIVILEGED' | 'STANDARD',
   })
   const [stepLabels, setStepLabels] = useState<string[]>(DEFAULT_STEP_LABELS)
   const [saving, setSaving] = useState(false)
@@ -147,12 +148,13 @@ function ServiceModal({
         basePrice: String(service.basePrice),
         isOptional: service.isOptional,
         isActive: service.isActive,
+        customerTier: service.customerTier ?? 'ALL',
       })
       // Extract step labels from existing workflow
       const labels: string[] = service.workflowDefinition?.steps?.map((s: any) => s.label) ?? DEFAULT_STEP_LABELS
       setStepLabels(labels.length > 0 ? labels : DEFAULT_STEP_LABELS)
     } else {
-      setForm({ name: '', description: '', basePrice: '', isOptional: false, isActive: true })
+      setForm({ name: '', description: '', basePrice: '', isOptional: false, isActive: true, customerTier: 'ALL' })
       setStepLabels([...DEFAULT_STEP_LABELS])
     }
   }, [service, open])
@@ -171,6 +173,7 @@ function ServiceModal({
         basePrice: parseFloat(form.basePrice),
         isOptional: form.isOptional,
         isActive: form.isActive,
+        customerTier: form.customerTier,
         workflowDefinition: buildWorkflow(stepLabels),
       }
       if (isEdit) await servicesApi.update(service.id, payload)
@@ -218,6 +221,35 @@ function ServiceModal({
             {form.isActive ? 'Active' : 'Inactive'}
           </button>
         </div>
+
+        {/* Customer tier */}
+        <Field label="Available To">
+          <div className="grid grid-cols-3 gap-2">
+            {([
+              ['ALL', 'Everyone', Users],
+              ['PRIVILEGED', 'Privileged', Crown],
+              ['STANDARD', 'Standard', Users],
+            ] as const).map(([val, label, Icon]) => (
+              <button key={val} type="button"
+                onClick={() => setForm(f => ({ ...f, customerTier: val }))}
+                className={`flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl text-xs font-medium border transition-colors ${
+                  form.customerTier === val
+                    ? val === 'PRIVILEGED'
+                      ? 'bg-amber-900/30 border-amber-700/50 text-amber-300'
+                      : 'bg-brand-900/30 border-brand-700/50 text-brand-300'
+                    : 'bg-gray-800 border-gray-700 text-gray-500'
+                }`}>
+                <Icon size={13} />
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-600 mt-1.5">
+            {form.customerTier === 'ALL' ? 'Visible when creating orders for any customer.' :
+             form.customerTier === 'PRIVILEGED' ? 'Only offered to privileged customers.' :
+             'Only offered to standard (non-privileged) customers.'}
+          </p>
+        </Field>
 
         {/* Workflow builder */}
         <Field label="Workflow Steps">
@@ -300,6 +332,11 @@ export default function ServicesPage() {
                     <Badge className={s.isOptional ? 'bg-amber-900/40 text-amber-300' : 'bg-blue-900/40 text-blue-300'}>
                       {s.isOptional ? 'Add-on' : 'Required'}
                     </Badge>
+                    {s.customerTier && s.customerTier !== 'ALL' && (
+                      <Badge className={s.customerTier === 'PRIVILEGED' ? 'bg-amber-900/40 text-amber-400 flex items-center gap-1' : 'bg-gray-800 text-gray-400'}>
+                        {s.customerTier === 'PRIVILEGED' ? <><Crown size={9} /> Privileged only</> : 'Standard only'}
+                      </Badge>
+                    )}
                   </div>
                   {s.description && <p className="text-xs text-gray-500 mt-0.5 truncate">{s.description}</p>}
 

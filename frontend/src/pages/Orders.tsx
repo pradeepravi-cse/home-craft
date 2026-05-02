@@ -4,7 +4,7 @@ import { ordersApi, customersApi, servicesApi, expensesApi, measurementsApi } fr
 import { PageHeader, Empty, Spinner, Badge, Modal, Field, ConfirmDialog } from '../components/ui'
 import { fmt, tat, STATUS_COLORS, STATUS_LABELS, NEXT_STATUS, NEXT_STATUS_LABEL, EXPENSE_CATEGORY_LABELS, ORDER_STATUSES } from '../utils'
 import toast from 'react-hot-toast'
-import { Plus, ShoppingBag, Trash2, Edit2, CheckCircle, Scissors, Package, ChevronRight, X, Ruler, Clock } from 'lucide-react'
+import { Plus, ShoppingBag, Trash2, Edit2, CheckCircle, Scissors, Package, ChevronRight, X, Ruler, Clock, Gift, Crown } from 'lucide-react'
 
 // ─── Orders List ──────────────────────────────────────────────────────────────
 export function OrdersPage() {
@@ -248,6 +248,31 @@ export function NewOrderPage() {
             {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </Field>
+
+        {/* Referral benefit + privilege notice for selected customer */}
+        {form.customerId && (() => {
+          const c = customers.find((x: any) => x.id === form.customerId)
+          if (!c) return null
+          return (
+            <div className="space-y-2">
+              {c.isPrivileged && (
+                <div className="flex items-center gap-2 rounded-xl bg-amber-900/20 border border-amber-800/40 px-3 py-2">
+                  <Crown size={13} className="text-amber-400 flex-shrink-0" />
+                  <p className="text-xs text-amber-300">Privileged customer — exclusive services may apply</p>
+                </div>
+              )}
+              {c.referralBenefitPending && (
+                <div className="flex items-center gap-2 rounded-xl bg-emerald-900/20 border border-emerald-800/40 px-3 py-2">
+                  <Gift size={13} className="text-emerald-400 flex-shrink-0" />
+                  <p className="text-xs text-emerald-300">
+                    This customer has a <span className="font-semibold">free saree pleating</span> benefit pending.
+                    Mark it used on their profile after applying.
+                  </p>
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Customer measurements — shown when customer selected + has services */}
         {form.customerId && hasServices && (
