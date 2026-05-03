@@ -3,6 +3,12 @@ import {
   CreateDateColumn, UpdateDateColumn,
 } from 'typeorm';
 
+export enum CustomerTier {
+  ALL = 'ALL',
+  PRIVILEGED = 'PRIVILEGED',
+  STANDARD = 'STANDARD',
+}
+
 export interface WorkflowStep {
   id: string;
   label: string;
@@ -43,6 +49,10 @@ export class Service {
 
   @Column({ default: true })
   isActive: boolean;
+
+  /** Which customer tier can access this service. ALL = everyone. */
+  @Column({ type: 'enum', enum: CustomerTier, default: CustomerTier.ALL })
+  customerTier: CustomerTier;
 
   @CreateDateColumn()
   createdAt: Date;

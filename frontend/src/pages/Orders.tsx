@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ordersApi, customersApi, servicesApi, expensesApi, measurementsApi } from '../api/client'
+import { ordersApi, customersApi, servicesApi, expensesApi, measurementsApi, referralBonusApi } from '../api/client'
 import { PageHeader, Empty, Spinner, Badge, Modal, Field, ConfirmDialog } from '../components/ui'
 import { fmt, tat, STATUS_COLORS, STATUS_LABELS, NEXT_STATUS, NEXT_STATUS_LABEL, EXPENSE_CATEGORY_LABELS, ORDER_STATUSES } from '../utils'
 import toast from 'react-hot-toast'
-import { Plus, ShoppingBag, Trash2, Edit2, CheckCircle, Scissors, Package, ChevronRight, X, Ruler, Clock } from 'lucide-react'
+import { Plus, ShoppingBag, Trash2, Edit2, CheckCircle, Scissors, Package, ChevronRight, X, Ruler, Clock, Gift, Crown } from 'lucide-react'
 
 // ─── Orders List ──────────────────────────────────────────────────────────────
 export function OrdersPage() {
@@ -156,12 +156,21 @@ export function NewOrderPage() {
   const [searchParams] = useSearchParams()
   const [customers, setCustomers] = useState<any[]>([])
   const [services, setServices] = useState<any[]>([])
-  const [items, setItems] = useState<Array<{ type: string; referenceId: string; name: string; price: number; quantity: number }>>([])
+  const [bonusConfigs, setBonusConfigs] = useState<any[]>([])
+  const [selectedCustomerFull, setSelectedCustomerFull] = useState<any>(null)
+
+  type OrderItem = {
+    type: string; referenceId: string; name: string
+    price: number; quantity: number
+    bonusApplied?: boolean; bonusAutoAdded?: boolean
+  }
+  const [items, setItems] = useState<OrderItem[]>([])
   const [form, setForm] = useState({
     customerId: searchParams.get('customerId') || '',
     notes: '', scheduledDate: '',
   })
   const [addModal, setAddModal] = useState<'service' | null>(null)
+  const [pendingBonus, setPendingBonus] = useState<any>(null) // config awaiting confirm
   const [pricing, setPricing] = useState<{ subtotal: number; discountAmount: number; totalAmount: number; appliedRules: string[] } | null>(null)
   const [saving, setSaving] = useState(false)
   const [measurements, setMeasurements] = useState<any[]>([])
@@ -170,15 +179,32 @@ export function NewOrderPage() {
     Promise.all([
       customersApi.list(),
       servicesApi.list(true),
-    ]).then(([c, s]) => { setCustomers(c); setServices(s) })
+      referralBonusApi.list().catch(() => []),
+    ]).then(([c, s, bc]) => {
+      setCustomers(c)
+      setServices(s)
+      setBonusConfigs((bc as any[]).filter((b: any) => b.isActive))
+    })
   }, [])
 
-  // Fetch customer measurements whenever customer changes
+  // Fetch full customer profile + measurements when customer changes
   useEffect(() => {
-    if (!form.customerId) { setMeasurements([]); return }
-    measurementsApi.byCustomer(form.customerId)
-      .then(setMeasurements)
-      .catch(() => setMeasurements([]))
+    if (!form.customerId) {
+      setMeasurements([]); setSelectedCustomerFull(null); return
+    }
+    Promise.all([
+      measurementsApi.byCustomer(form.customerId).catch(() => []),
+      customersApi.get(form.customerId).catch(() => null),
+    ]).then(([m, c]) => { setMeasurements(m); setSelectedCustomerFull(c) })
+    // Clear bonus state when customer changes
+    setItems(prev => prev
+      .filter(i => !i.bonusAutoAdded) // remove auto-added bonus services
+      .map(i => {
+        if (!i.bonusApplied) return i
+        const svc = services.find(s => s.id === i.referenceId)
+        return { ...i, price: Number(svc?.basePrice ?? i.price), bonusApplied: false }
+      })
+    )
   }, [form.customerId])
 
   // Live pricing preview
@@ -215,17 +241,65 @@ export function NewOrderPage() {
     setItems(prev => prev.map(i => i.referenceId === referenceId ? { ...i, quantity: q } : i))
   }
 
+  const applyBonus = (config: any) => {
+    const svc = services.find(s => s.id === config.rewardServiceId)
+    if (!svc) { toast.error('Reward service not found'); setPendingBonus(null); return }
+    const alreadyInCart = items.some(i => i.referenceId === config.rewardServiceId)
+    if (alreadyInCart) {
+      // Zero out the existing item in-place
+      setItems(prev => prev.map(i =>
+        i.referenceId === config.rewardServiceId
+          ? { ...i, price: 0, bonusApplied: true, bonusAutoAdded: false }
+          : i
+      ))
+    } else {
+      // Auto-add the service at RM 0
+      setItems(prev => [...prev, {
+        type: 'SERVICE', referenceId: svc.id, name: svc.name,
+        price: 0, quantity: 1, bonusApplied: true, bonusAutoAdded: true,
+      }])
+    }
+    setPendingBonus(null)
+    toast.success(`Bonus applied — ${svc.name} is FREE`)
+  }
+
+  const removeBonus = () => {
+    setItems(prev => prev
+      .filter(i => !i.bonusAutoAdded) // remove auto-added entries
+      .map(i => {
+        if (!i.bonusApplied) return i
+        const svc = services.find(s => s.id === i.referenceId)
+        return { ...i, price: Number(svc?.basePrice ?? i.price), bonusApplied: false }
+      })
+    )
+  }
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (items.length === 0) { toast.error('Add at least one item'); return }
     setSaving(true)
     try {
+      const bonusItem = items.find(i => i.bonusApplied)
+      const bonusOriginalPrice = bonusItem
+        ? services.find(s => s.id === bonusItem.referenceId)?.basePrice
+        : undefined
+
       const order = await ordersApi.create({
         customerId: form.customerId,
         notes: form.notes || undefined,
         scheduledDate: form.scheduledDate || undefined,
-        items: items.map(i => ({ type: i.type, referenceId: i.referenceId, quantity: i.quantity })),
+        items: items.map(i => ({
+          type: i.type,
+          referenceId: i.referenceId,
+          quantity: i.quantity,
+          ...(i.bonusApplied ? { unitPriceOverride: 0 } : {}),
+        })),
+        referralBonusApplied: Boolean(bonusItem),
+        referralBonusValue: bonusOriginalPrice ? Number(bonusOriginalPrice) : undefined,
       })
+      if (bonusItem && form.customerId) {
+        await customersApi.redeemReferralBonus(form.customerId).catch(() => {})
+      }
       toast.success('Order created')
       navigate(`/orders/${order.id}`)
     } catch (err: any) {
@@ -234,7 +308,26 @@ export function NewOrderPage() {
   }
 
   const hasServices = items.some(i => i.type === 'SERVICE')
-  const activeMeasurement = measurements[0] // most recent measurement
+  const activeMeasurement = measurements[0]
+  const bonusAlreadyApplied = items.some(i => i.bonusApplied)
+  const referralCount = selectedCustomerFull?.referrals?.length ?? 0
+  const referralBonusUsed = selectedCustomerFull?.referralBonusUsed ?? 0
+
+  // Per-config credit availability
+  const configsWithCredits = bonusConfigs.map(bc => ({
+    ...bc,
+    availableCredits: Math.max(0, Math.floor(referralCount / (bc.referralsRequired ?? 1)) - referralBonusUsed),
+  })).filter(bc => bc.availableCredits > 0)
+
+  const totalAvailableCredits = configsWithCredits.reduce((s, bc) => s + bc.availableCredits, 0)
+
+  // Filter services based on customer privilege tier
+  const visibleServices = (s: any) => {
+    if (!s.customerTier || s.customerTier === 'ALL') return true
+    if (s.customerTier === 'PRIVILEGED') return selectedCustomerFull?.isPrivileged === true
+    if (s.customerTier === 'STANDARD') return selectedCustomerFull?.isPrivileged !== true
+    return true
+  }
 
   return (
     <div>
@@ -243,13 +336,73 @@ export function NewOrderPage() {
 
         {/* Customer */}
         <Field label="Customer *">
-          <select className="input" value={form.customerId} onChange={e => setForm(f => ({ ...f, customerId: e.target.value }))} required>
+          <select className="input" value={form.customerId}
+            onChange={e => setForm(f => ({ ...f, customerId: e.target.value }))} required>
             <option value="">Select customer…</option>
-            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {customers.map(c => <option key={c.id} value={c.id}>{c.name}{c.isPrivileged ? ' ★' : ''}</option>)}
           </select>
         </Field>
 
-        {/* Customer measurements — shown when customer selected + has services */}
+        {/* Customer badges */}
+        {selectedCustomerFull && (
+          <div className="flex flex-wrap gap-2">
+            {selectedCustomerFull.isPrivileged && (
+              <div className="flex items-center gap-1.5 rounded-xl bg-amber-900/20 border border-amber-800/40 px-3 py-1.5">
+                <Crown size={12} className="text-amber-400" />
+                <span className="text-xs text-amber-300 font-medium">Privileged — exclusive services unlocked</span>
+              </div>
+            )}
+            {totalAvailableCredits > 0 && (
+              <div className="flex items-center gap-1.5 rounded-xl bg-brand-900/20 border border-brand-800/40 px-3 py-1.5">
+                <Gift size={12} className="text-brand-400" />
+                <span className="text-xs text-brand-300 font-medium">
+                  {totalAvailableCredits} referral reward{totalAvailableCredits > 1 ? 's' : ''} available
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Referral reward picker — explicit per-config Apply buttons */}
+        {!bonusAlreadyApplied && configsWithCredits.length > 0 && (
+          <div className="rounded-xl border border-amber-800/40 bg-amber-900/10 px-4 py-3 space-y-2">
+            <p className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+              <Gift size={12} /> Referral Rewards — select one to apply
+            </p>
+            {configsWithCredits.map(bc => (
+              <div key={bc.id} className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm text-white font-medium truncate">{bc.name}</p>
+                  <p className="text-xs text-gray-500">
+                    Free: <span className="text-amber-400">{bc.rewardService?.name ?? '—'}</span>
+                    {' · '}{bc.availableCredits} credit{bc.availableCredits > 1 ? 's' : ''} left
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPendingBonus(bc)}
+                  className="flex-shrink-0 text-xs bg-amber-500 hover:bg-amber-400 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
+                  Apply
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {bonusAlreadyApplied && (
+          <div className="rounded-xl bg-emerald-900/20 border border-emerald-800/40 px-4 py-2.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Gift size={14} className="text-emerald-400 flex-shrink-0" />
+              <p className="text-xs text-emerald-300 font-medium">
+                Referral bonus applied — {items.find(i => i.bonusApplied)?.name} is FREE
+              </p>
+            </div>
+            <button type="button" onClick={removeBonus} className="text-xs text-gray-500 hover:text-red-400 transition-colors">
+              Remove
+            </button>
+          </div>
+        )}
+
+        {/* Customer measurements */}
         {form.customerId && hasServices && (
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -291,7 +444,7 @@ export function NewOrderPage() {
                   <p className="text-xs text-gray-500 border-t border-gray-800 pt-1.5">{activeMeasurement.notes}</p>
                 )}
                 {measurements.length > 1 && (
-                  <p className="text-xs text-gray-600">+{measurements.length - 1} more measurement set(s) on profile</p>
+                  <p className="text-xs text-gray-600">+{measurements.length - 1} more set(s) on profile</p>
                 )}
               </div>
             ) : (
@@ -322,20 +475,26 @@ export function NewOrderPage() {
           ) : (
             <div className="space-y-2">
               {items.map(item => (
-                <div key={item.referenceId} className="card flex items-center gap-3">
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${item.type === 'SERVICE' ? 'bg-brand-900/40' : 'bg-amber-900/40'}`}>
-                    {item.type === 'SERVICE' ? <Scissors size={13} className="text-brand-400" /> : <Package size={13} className="text-amber-400" />}
+                <div key={item.referenceId} className={`card flex items-center gap-3 ${item.bonusApplied ? 'border-amber-800/50 bg-amber-900/10' : ''}`}>
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${item.bonusApplied ? 'bg-amber-900/40' : item.type === 'SERVICE' ? 'bg-brand-900/40' : 'bg-amber-900/40'}`}>
+                    {item.bonusApplied ? <Gift size={13} className="text-amber-400" />
+                      : item.type === 'SERVICE' ? <Scissors size={13} className="text-brand-400" />
+                      : <Package size={13} className="text-amber-400" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-white font-medium truncate">{item.name}</p>
-                    <p className="text-xs text-gray-500">{fmt.currency(item.price)} each</p>
+                    {item.bonusApplied
+                      ? <p className="text-xs text-amber-400 font-medium">FREE · Referral Bonus</p>
+                      : <p className="text-xs text-gray-500">{fmt.currency(item.price)} each</p>}
                   </div>
                   <div className="flex items-center gap-2">
                     <button type="button" onClick={() => changeQty(item.referenceId, item.quantity - 1)} className="w-6 h-6 rounded-full bg-gray-700 text-white text-sm flex items-center justify-center hover:bg-gray-600">−</button>
                     <span className="text-sm text-white w-4 text-center">{item.quantity}</span>
                     <button type="button" onClick={() => changeQty(item.referenceId, item.quantity + 1)} className="w-6 h-6 rounded-full bg-gray-700 text-white text-sm flex items-center justify-center hover:bg-gray-600">+</button>
                   </div>
-                  <span className="text-sm font-medium text-white w-16 text-right">{fmt.currency(item.price * item.quantity)}</span>
+                  <span className={`text-sm font-medium w-16 text-right ${item.bonusApplied ? 'text-amber-400' : 'text-white'}`}>
+                    {item.bonusApplied ? 'FREE' : fmt.currency(item.price * item.quantity)}
+                  </span>
                   <button type="button" onClick={() => removeItem(item.referenceId)} className="text-gray-600 hover:text-red-400 ml-1"><X size={14} /></button>
                 </div>
               ))}
@@ -356,6 +515,11 @@ export function NewOrderPage() {
                   <span>−{fmt.currency(pricing.discountAmount)}</span>
                 </div>
               )}
+              {bonusAlreadyApplied && (
+                <div className="flex justify-between text-amber-400">
+                  <span>Referral bonus</span><span>applied</span>
+                </div>
+              )}
               <div className="flex justify-between text-white font-semibold pt-1.5 border-t border-gray-800">
                 <span>Total</span><span>{fmt.currency(pricing.totalAmount)}</span>
               </div>
@@ -366,37 +530,78 @@ export function NewOrderPage() {
         {/* Schedule & Notes */}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Scheduled Date">
-            <input type="date" className="input" value={form.scheduledDate} onChange={e => setForm(f => ({ ...f, scheduledDate: e.target.value }))} />
+            <input type="date" className="input" value={form.scheduledDate}
+              onChange={e => setForm(f => ({ ...f, scheduledDate: e.target.value }))} />
           </Field>
         </div>
         <Field label="Notes">
-          <textarea className="input" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Any special instructions…" />
+          <textarea className="input" value={form.notes}
+            onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+            placeholder="Any special instructions…" />
         </Field>
 
         <div className="flex gap-3 pt-1">
           <button type="button" onClick={() => navigate(-1)} className="btn-secondary flex-1">Cancel</button>
-          <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? 'Creating…' : 'Create Order'}</button>
+          <button type="submit" disabled={saving} className="btn-primary flex-1">
+            {saving ? 'Creating…' : 'Create Order'}
+          </button>
         </div>
       </form>
 
       {/* Add Service Modal */}
       <Modal open={addModal === 'service'} onClose={() => setAddModal(null)} title="Add Service">
         <div className="space-y-2">
-          {services.filter(s => !items.find(i => i.referenceId === s.id)).map(s => (
-            <button key={s.id} onClick={() => addItem('SERVICE', s)} className="w-full card hover:border-brand-700 transition-colors flex items-center gap-3 text-left">
-              <div className="w-8 h-8 rounded-lg bg-brand-900/40 flex items-center justify-center flex-shrink-0"><Scissors size={14} className="text-brand-400" /></div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white">{s.name}</p>
-                {s.description && <p className="text-xs text-gray-500 truncate">{s.description}</p>}
-                <p className="text-xs text-gray-400 mt-0.5">{s.isOptional ? 'Add-on' : 'Required'}</p>
-              </div>
-              <span className="text-sm font-semibold text-brand-300">{fmt.currency(s.basePrice)}</span>
-            </button>
-          ))}
-          {services.filter(s => !items.find(i => i.referenceId === s.id)).length === 0 && (
-            <p className="text-gray-500 text-sm text-center py-4">All active services already added</p>
+          {services
+            .filter(s => !items.find(i => i.referenceId === s.id))
+            .filter(visibleServices)
+            .map(s => (
+              <button key={s.id} onClick={() => addItem('SERVICE', s)}
+                className="w-full card hover:border-brand-700 transition-colors flex items-center gap-3 text-left">
+                <div className="w-8 h-8 rounded-lg bg-brand-900/40 flex items-center justify-center flex-shrink-0">
+                  <Scissors size={14} className="text-brand-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-medium text-white">{s.name}</p>
+                    {s.customerTier === 'PRIVILEGED' && <Crown size={11} className="text-amber-400" />}
+                  </div>
+                  {s.description && <p className="text-xs text-gray-500 truncate">{s.description}</p>}
+                  <p className="text-xs text-gray-400 mt-0.5">{s.isOptional ? 'Add-on' : 'Required'}</p>
+                </div>
+                <span className="text-sm font-semibold text-brand-300">{fmt.currency(s.basePrice)}</span>
+              </button>
+            ))}
+          {services.filter(s => !items.find(i => i.referenceId === s.id)).filter(visibleServices).length === 0 && (
+            <p className="text-gray-500 text-sm text-center py-4">No services available for this customer</p>
           )}
         </div>
+      </Modal>
+
+      {/* Bonus confirm dialog */}
+      <Modal open={Boolean(pendingBonus)} onClose={() => setPendingBonus(null)} title="Apply Referral Bonus">
+        {pendingBonus && (
+          <div className="space-y-4">
+            <div className="rounded-xl bg-amber-900/20 border border-amber-800/40 px-4 py-3">
+              <p className="text-sm text-amber-300 font-medium mb-1">{pendingBonus.name}</p>
+              <p className="text-xs text-gray-400">
+                <span className="text-amber-400 font-medium">{pendingBonus.rewardService?.name}</span> will be charged at{' '}
+                <span className="text-white font-semibold">RM 0.00</span> for this order.
+              </p>
+              <p className="text-xs text-gray-600 mt-1.5">
+                1 credit will be deducted from this customer's referral balance after saving.
+                {pendingBonus.availableCredits > 1 && ` ${pendingBonus.availableCredits - 1} credit${pendingBonus.availableCredits - 1 > 1 ? 's' : ''} will remain.`}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setPendingBonus(null)} className="btn-secondary w-full">
+                Charge Normally
+              </button>
+              <button onClick={() => applyBonus(pendingBonus)} className="btn-primary w-full">
+                Apply — Make Free
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
 
     </div>

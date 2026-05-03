@@ -1,10 +1,73 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { customersApi, measurementsApi, ordersApi } from '../api/client'
+import { customersApi, measurementsApi, ordersApi, referralBonusApi } from '../api/client'
 import { PageHeader, Empty, Spinner, Badge, Modal, Field, ConfirmDialog } from '../components/ui'
 import { fmt, STATUS_COLORS, STATUS_LABELS } from '../utils'
 import toast from 'react-hot-toast'
-import { Plus, User, Phone, Trash2, Edit2, Ruler, ShoppingBag, ChevronRight } from 'lucide-react'
+import {
+  Plus, User, Phone, Trash2, Edit2, Ruler, ShoppingBag, ChevronRight,
+  Crown, Gift, Users, BarChart2,
+} from 'lucide-react'
+
+// ─── Order list with bonus badge + filter ────────────────────────────────────
+
+function OrderList({ orders }: { orders: any[] }) {
+  return (
+    <div className="space-y-2">
+      {orders.map(o => {
+        const summary = o.items?.length
+          ? o.items.slice(0, 2).map((i: any) => i.name).join(', ')
+          : '—'
+        return (
+          <Link key={o.id} to={`/orders/${o.id}`}
+            className={`card flex items-center gap-3 hover:border-gray-700 transition-colors ${o.referralBonusApplied ? 'border-amber-900/40' : ''}`}>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <p className="text-sm font-medium text-white truncate">{summary}</p>
+                {o.referralBonusApplied && (
+                  <span className="flex items-center gap-0.5 text-xs bg-amber-900/40 text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-800/40 flex-shrink-0">
+                    <Gift size={9} /> Bonus
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500">{fmt.date(o.createdAt)}</p>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <Badge className={STATUS_COLORS[o.status]}>{STATUS_LABELS[o.status]}</Badge>
+              <div className="flex items-center gap-1">
+                {o.referralBonusApplied && o.referralBonusValue > 0 && (
+                  <span className="text-xs text-amber-600 line-through">{fmt.currency(Number(o.totalAmount) + Number(o.referralBonusValue))}</span>
+                )}
+                <span className="text-xs text-gray-400">{fmt.currency(o.totalAmount)}</span>
+              </div>
+            </div>
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
+
+function OrderBonusFilter({ orders }: { orders: any[] }) {
+  const [showBonusOnly, setShowBonusOnly] = useState(false)
+  const bonusCount = orders.filter(o => o.referralBonusApplied).length
+  const filtered = showBonusOnly ? orders.filter(o => o.referralBonusApplied) : orders
+  return (
+    <div className="mb-2 space-y-2">
+      <button
+        onClick={() => setShowBonusOnly(v => !v)}
+        className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-colors ${
+          showBonusOnly
+            ? 'bg-amber-900/30 border-amber-700/50 text-amber-300'
+            : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white'
+        }`}>
+        <Gift size={10} />
+        {showBonusOnly ? `Showing ${bonusCount} bonus order${bonusCount !== 1 ? 's' : ''}` : `${bonusCount} with referral bonus`}
+      </button>
+      <OrderList orders={filtered} />
+    </div>
+  )
+}
 
 // ─── Customer List ────────────────────────────────────────────────────────────
 export function CustomersPage() {
@@ -51,17 +114,25 @@ export function CustomersPage() {
         <div className="px-4 space-y-2">
           {customers.map(c => (
             <Link key={c.id} to={`/customers/${c.id}`} className="card flex items-center gap-3 hover:border-gray-700 transition-colors">
-              <div className="w-10 h-10 rounded-full bg-brand-900/40 border border-brand-800/50 flex items-center justify-center text-brand-300 font-display font-bold text-lg flex-shrink-0">
-                {c.name[0].toUpperCase()}
+              <div className="relative w-10 h-10 flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-brand-900/40 border border-brand-800/50 flex items-center justify-center text-brand-300 font-display font-bold text-lg">
+                  {c.name[0].toUpperCase()}
+                </div>
+                {c.isPrivileged && (
+                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center">
+                    <Crown size={9} className="text-white" />
+                  </div>
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-white truncate">{c.name}</p>
                 <p className="text-xs text-gray-500">
                   {c.nickname ? `"${c.nickname}" · ` : ''}{c.phone || 'No phone'}
+                  {c.referredBy ? ` · via ${c.referredBy.name}` : ''}
                 </p>
               </div>
               <div className="flex flex-col items-end gap-1">
-                <span className="text-xs text-gray-500">{c.measurements?.length || 0} measurements</span>
+                <span className="text-xs text-gray-500">{c.measurements?.length || 0} meas.</span>
                 <ChevronRight size={14} className="text-gray-600" />
               </div>
             </Link>
@@ -77,16 +148,23 @@ export function CustomerFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const isEdit = Boolean(id)
-  const [form, setForm] = useState({ name: '', nickname: '', phone: '', notes: '' })
+  const [form, setForm] = useState({ name: '', nickname: '', phone: '', notes: '', referredById: '' })
+  const [allCustomers, setAllCustomers] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (isEdit) customersApi.get(id!).then(c => setForm({
-      name: c.name,
-      nickname: c.nickname || '',
-      phone: c.phone || '',
-      notes: c.notes || '',
-    }))
+    customersApi.list().then(list => {
+      setAllCustomers(list.filter((c: any) => c.id !== id))
+    })
+    if (isEdit) {
+      customersApi.get(id!).then(c => setForm({
+        name: c.name,
+        nickname: c.nickname || '',
+        phone: c.phone || '',
+        notes: c.notes || '',
+        referredById: c.referredById || '',
+      }))
+    }
   }, [id])
 
   const submit = async (e: React.FormEvent) => {
@@ -96,6 +174,8 @@ export function CustomerFormPage() {
     if (form.nickname) payload.nickname = form.nickname
     if (form.phone) payload.phone = form.phone
     if (form.notes) payload.notes = form.notes
+    // Always send referredById — null clears it on edit, empty string becomes null
+    payload.referredById = form.referredById || null
     try {
       if (isEdit) {
         await customersApi.update(id!, payload)
@@ -133,6 +213,22 @@ export function CustomerFormPage() {
             onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
             placeholder="Any special notes…" />
         </Field>
+
+        <Field label="Referred by (optional)">
+          <select className="input" value={form.referredById}
+            onChange={e => setForm(f => ({ ...f, referredById: e.target.value }))}>
+            <option value="">— No referral —</option>
+            {allCustomers.map(c => (
+              <option key={c.id} value={c.id}>{c.name}{c.nickname ? ` (${c.nickname})` : ''}</option>
+            ))}
+          </select>
+          {form.referredById && (
+            <p className="text-xs text-amber-400 mt-1 flex items-center gap-1">
+              <Gift size={11} /> The referring customer earns a reward credit for this referral.
+            </p>
+          )}
+        </Field>
+
         <button type="submit" disabled={saving} className="btn-primary w-full">
           {saving ? 'Saving…' : 'Save Customer'}
         </button>
@@ -149,6 +245,7 @@ export function CustomerDetailPage() {
   const [customer, setCustomer] = useState<any>(null)
   const [orders, setOrders] = useState<any[]>([])
   const [measurements, setMeasurements] = useState<any[]>([])
+  const [bonusConfig, setBonusConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [mModal, setMModal] = useState(false)
   const [mForm, setMForm] = useState({
@@ -157,17 +254,31 @@ export function CustomerDetailPage() {
   })
   const [editMeasurement, setEditMeasurement] = useState<any>(null)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [togglingPrivilege, setTogglingPrivilege] = useState(false)
+  const [savingMeasurement, setSavingMeasurement] = useState(false)
+  const [deletingMeasurementId, setDeletingMeasurementId] = useState<string | null>(null)
+
   const load = async () => {
-    const [c, o, m] = await Promise.all([
+    const [c, o, m, bc] = await Promise.all([
       customersApi.get(id!),
       ordersApi.list({ customerId: id }),
       measurementsApi.byCustomer(id!),
+      referralBonusApi.active().catch(() => null),
     ])
-    setCustomer(c); setOrders(o); setMeasurements(m)
+    setCustomer(c); setOrders(o); setMeasurements(m); setBonusConfig(bc)
     setLoading(false)
   }
 
   useEffect(() => { load() }, [id])
+
+  const togglePrivilege = async () => {
+    setTogglingPrivilege(true)
+    try {
+      await customersApi.update(id!, { isPrivileged: !customer.isPrivileged })
+      toast.success(customer.isPrivileged ? 'Removed privileged status' : 'Marked as privileged')
+      load()
+    } catch { toast.error('Failed to update') } finally { setTogglingPrivilege(false) }
+  }
 
   const openAddMeasurement = () => {
     setEditMeasurement(null)
@@ -186,6 +297,7 @@ export function CustomerDetailPage() {
   }
 
   const saveMeasurement = async () => {
+    setSavingMeasurement(true)
     try {
       const data = {
         customerId: id,
@@ -200,7 +312,15 @@ export function CustomerDetailPage() {
       toast.success('Measurements saved')
       setMModal(false)
       load()
-    } catch { toast.error('Failed to save') }
+    } catch { toast.error('Failed to save') } finally { setSavingMeasurement(false) }
+  }
+
+  const deleteMeasurement = async (measurementId: string) => {
+    setDeletingMeasurementId(measurementId)
+    try {
+      await measurementsApi.delete(measurementId)
+      load()
+    } catch { toast.error('Failed to delete') } finally { setDeletingMeasurementId(null) }
   }
 
   const deleteCustomer = async () => {
@@ -215,15 +335,32 @@ export function CustomerDetailPage() {
     .filter(o => o.status === 'COMPLETED')
     .reduce((sum, o) => sum + Number(o.totalAmount), 0)
 
+  const referralCount = customer.referrals?.length ?? 0
+  const referralsRequired = bonusConfig?.referralsRequired ?? 1
+  const earned = Math.floor(referralCount / referralsRequired)
+  const availableCredits = Math.max(0, earned - (customer.referralBonusUsed ?? 0))
+
   return (
     <div>
       <div className="px-4 pt-5 pb-3 flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-brand-900/40 border border-brand-800/50 flex items-center justify-center text-brand-300 font-display font-bold text-xl">
-            {customer.name[0].toUpperCase()}
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full bg-brand-900/40 border border-brand-800/50 flex items-center justify-center text-brand-300 font-display font-bold text-xl">
+              {customer.name[0].toUpperCase()}
+            </div>
+            {customer.isPrivileged && (
+              <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+                <Crown size={11} className="text-white" />
+              </div>
+            )}
           </div>
           <div>
-            <h1 className="font-display text-xl font-bold text-white">{customer.name}</h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="font-display text-xl font-bold text-white">{customer.name}</h1>
+              {customer.isPrivileged && (
+                <Badge className="bg-amber-900/40 text-amber-300 border border-amber-800/40">Privileged</Badge>
+              )}
+            </div>
             {customer.phone && <p className="text-xs text-gray-500">{customer.phone}</p>}
           </div>
         </div>
@@ -232,6 +369,21 @@ export function CustomerDetailPage() {
           <button onClick={() => setDeleteConfirm(true)} className="btn-danger p-2.5"><Trash2 size={16} /></button>
         </div>
       </div>
+
+      {/* Referral bonus credit banner — shown on the REFERRER's profile */}
+      {availableCredits > 0 && bonusConfig && (
+        <div className="mx-4 mb-3 rounded-xl bg-amber-900/20 border border-amber-800/50 px-4 py-3 flex items-center gap-3">
+          <Gift size={16} className="text-amber-400 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-amber-300">
+              {availableCredits} referral reward{availableCredits > 1 ? 's' : ''} available
+            </p>
+            <p className="text-xs text-amber-700">
+              Reward credits apply when creating an order
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="px-4 mb-4 grid grid-cols-3 gap-2">
@@ -244,9 +396,30 @@ export function CustomerDetailPage() {
           <p className="text-xs text-gray-500">Total Spent</p>
         </div>
         <div className="card text-center py-3">
-          <p className="text-lg font-bold text-white">{measurements.length}</p>
-          <p className="text-xs text-gray-500">Measurements</p>
+          <p className="text-lg font-bold text-white">{referralCount}</p>
+          <p className="text-xs text-gray-500">Referrals</p>
         </div>
+      </div>
+
+      {/* Actions */}
+      <div className="px-4 mb-4 grid grid-cols-2 gap-2">
+        <button
+          onClick={togglePrivilege}
+          disabled={togglingPrivilege}
+          className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+            customer.isPrivileged
+              ? 'bg-amber-900/30 border-amber-700/50 text-amber-300 hover:bg-amber-900/50'
+              : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
+          }`}>
+          <Crown size={14} />
+          {customer.isPrivileged ? 'Privileged' : 'Mark Privileged'}
+        </button>
+        <Link
+          to={`/customers/${id}/360`}
+          className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium border bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700 transition-colors">
+          <BarChart2 size={14} />
+          View 360
+        </Link>
       </div>
 
       {/* Contact */}
@@ -264,6 +437,26 @@ export function CustomerDetailPage() {
             </a>
           ) : (
             <p className="text-xs text-gray-600">No phone number</p>
+          )}
+          {customer.referredBy && (
+            <div className="flex items-center gap-2 pt-1 border-t border-gray-800">
+              <Users size={12} className="text-gray-500 flex-shrink-0" />
+              <p className="text-xs text-gray-500">
+                Introduced by{' '}
+                <Link to={`/customers/${customer.referredBy.id}`} className="text-brand-400 hover:text-brand-300">
+                  {customer.referredBy.name}
+                </Link>
+              </p>
+            </div>
+          )}
+          {referralCount > 0 && (
+            <div className="flex items-center gap-2 pt-1 border-t border-gray-800">
+              <Gift size={12} className="text-gray-500 flex-shrink-0" />
+              <p className="text-xs text-gray-500">
+                Referred {referralCount} customer{referralCount !== 1 ? 's' : ''} ·{' '}
+                <Link to={`/customers/${id}/360`} className="text-brand-400 hover:text-brand-300">view network</Link>
+              </p>
+            </div>
           )}
           {customer.notes && <p className="text-xs text-gray-500 pt-1 border-t border-gray-800">{customer.notes}</p>}
         </div>
@@ -288,7 +481,14 @@ export function CustomerDetailPage() {
                   <span className="text-sm font-medium text-white">{m.label || 'Measurement'}</span>
                   <div className="flex gap-2">
                     <button onClick={() => openEditMeasurement(m)} className="text-gray-500 hover:text-white"><Edit2 size={14} /></button>
-                    <button onClick={async () => { await measurementsApi.delete(m.id); load() }} className="text-red-500 hover:text-red-300"><Trash2 size={14} /></button>
+                    <button
+                      onClick={() => deleteMeasurement(m.id)}
+                      disabled={deletingMeasurementId === m.id}
+                      className="text-red-500 hover:text-red-300 disabled:opacity-40">
+                      {deletingMeasurementId === m.id
+                        ? <span className="w-3 h-3 border border-red-500 border-t-transparent rounded-full animate-spin block" />
+                        : <Trash2 size={14} />}
+                    </button>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
@@ -310,31 +510,19 @@ export function CustomerDetailPage() {
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Orders ({orders.length})</h2>
           <Link to={`/orders/new?customerId=${id}`} className="text-brand-400 text-xs flex items-center gap-1"><Plus size={12} /> New</Link>
         </div>
+
+        {/* Filter: referral bonus orders */}
+        {orders.some((o: any) => o.referralBonusApplied) && (
+          <OrderBonusFilter orders={orders} />
+        )}
+
         {orders.length === 0 ? (
           <div className="card text-center py-6">
             <ShoppingBag size={24} className="text-gray-600 mx-auto mb-2" />
             <p className="text-gray-500 text-sm">No orders yet</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {orders.map(o => {
-              const summary = o.items?.length
-                ? o.items.slice(0, 2).map((i: any) => i.name).join(', ')
-                : '—'
-              return (
-                <Link key={o.id} to={`/orders/${o.id}`} className="card flex items-center gap-3 hover:border-gray-700 transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{summary}</p>
-                    <p className="text-xs text-gray-500">{fmt.date(o.createdAt)}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <Badge className={STATUS_COLORS[o.status]}>{STATUS_LABELS[o.status]}</Badge>
-                    <span className="text-xs text-gray-400">{fmt.currency(o.totalAmount)}</span>
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
+          <OrderList orders={orders} />
         )}
       </div>
 
@@ -360,7 +548,9 @@ export function CustomerDetailPage() {
           <Field label="Notes">
             <textarea className="input" value={mForm.notes} onChange={e => setMForm(f => ({ ...f, notes: e.target.value }))} placeholder="Any notes…" />
           </Field>
-          <button onClick={saveMeasurement} className="btn-primary w-full">Save</button>
+          <button onClick={saveMeasurement} disabled={savingMeasurement} className="btn-primary w-full">
+            {savingMeasurement ? 'Saving…' : 'Save'}
+          </button>
         </div>
       </Modal>
 

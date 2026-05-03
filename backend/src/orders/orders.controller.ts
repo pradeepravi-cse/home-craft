@@ -21,13 +21,23 @@ export class OrdersController {
   findAll(
     @Query('customerId') customerId?: string,
     @Query('status') status?: OrderStatus,
+    @Query('referralBonusApplied') referralBonusApplied?: string,
   ) {
-    return this.service.findAll({ customerId, status });
+    return this.service.findAll({
+      customerId,
+      status,
+      referralBonusApplied: referralBonusApplied !== undefined ? referralBonusApplied === 'true' : undefined,
+    });
   }
 
   @Get('stats')
   getStats() {
     return this.service.getStats();
+  }
+
+  @Get('referral-bonus-stats')
+  getReferralBonusStats() {
+    return this.service.getReferralBonusStats();
   }
 
   @Get(':id')

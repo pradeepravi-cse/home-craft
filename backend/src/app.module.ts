@@ -28,6 +28,7 @@ import { RecipesModule } from './recipes/recipes.module';
 import { ServiceRecipesModule } from './service-recipes/service-recipes.module';
 import { BusinessSettingsModule } from './business-settings/business-settings.module';
 import { InvestmentsModule } from './investments/investments.module';
+import { ReferralBonusConfigModule } from './referral-bonus/referral-bonus-config.module';
 
 import { AuditLogModule } from './audit/audit-log.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -125,7 +126,10 @@ const IS_PROD = process.env.NODE_ENV === 'production';
           extra: { options: `-c search_path="${schema}"` },
           uuidExtension: 'pgcrypto',
           autoLoadEntities: true,
-          synchronize: true,
+          // synchronize: true caused data loss when adding PostgreSQL enum types
+          // in a non-public schema (dev-db). Disabled permanently — run migrations
+          // manually via the Supabase SQL editor instead.
+          synchronize: false,
           logging: false,
         };
       },
@@ -149,6 +153,7 @@ const IS_PROD = process.env.NODE_ENV === 'production';
     ServiceRecipesModule,
     BusinessSettingsModule,
     InvestmentsModule,
+    ReferralBonusConfigModule,
   ],
   providers: [
     // Rate limiting enforced on every endpoint globally

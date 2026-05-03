@@ -1,7 +1,7 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
   CreateDateColumn, UpdateDateColumn,
-  OneToMany,
+  OneToMany, ManyToOne, JoinColumn,
 } from 'typeorm';
 import { Order } from '../orders/order.entity';
 import { Measurement } from '../measurements/measurement.entity';
@@ -40,6 +40,25 @@ export class Customer {
 
   @Column({ type: 'enum', enum: ContactSource, default: ContactSource.WHATSAPP })
   contactSource: ContactSource;
+
+  /** Who introduced this customer to the business */
+  @Column({ nullable: true })
+  referredById: string | null;
+
+  @ManyToOne(() => Customer, (c) => c.referrals, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'referredById' })
+  referredBy: Customer | null;
+
+  @OneToMany(() => Customer, (c) => c.referredBy)
+  referrals: Customer[];
+
+  /** Exclusive offers and priority handling */
+  @Column({ default: false })
+  isPrivileged: boolean;
+
+  /** How many referral bonus credits this customer (as referrer) has already redeemed */
+  @Column({ type: 'int', default: 0 })
+  referralBonusUsed: number;
 
   @OneToMany(() => Order, (order) => order.customer)
   orders: Order[];

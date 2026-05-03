@@ -3,6 +3,7 @@ import {
   Param, Body, Query, HttpCode, HttpStatus,
   UseGuards,
 } from '@nestjs/common';
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CustomersService, CreateCustomerDto, UpdateCustomerDto } from './customers.service';
 
@@ -14,6 +15,17 @@ export class CustomersController {
   @Get()
   findAll(@Query('search') search?: string) {
     return this.customersService.findAll(search);
+  }
+
+  @Get(':id/referral-stats')
+  getReferralStats(@Param('id') id: string, @Query('referralsRequired') referralsRequired?: string) {
+    return this.customersService.getReferralStats(id, referralsRequired ? parseInt(referralsRequired, 10) : 1);
+  }
+
+  @Post(':id/redeem-referral-bonus')
+  @HttpCode(HttpStatus.OK)
+  redeemReferralBonus(@Param('id') id: string) {
+    return this.customersService.redeemReferralBonus(id);
   }
 
   @Get(':id')

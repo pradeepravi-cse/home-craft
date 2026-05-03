@@ -5,7 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import {
   IsString, IsOptional, IsEnum, IsArray, ValidateNested,
-  IsInt, Min, IsDateString,
+  IsInt, IsNumber, IsBoolean, Min, IsDateString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
@@ -32,6 +32,12 @@ export class CreateOrderItemDto {
   @IsInt()
   @Min(1)
   quantity: number;
+
+  /** Owner can explicitly override the unit price (e.g. to 0 when applying a referral bonus) */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  unitPriceOverride?: number;
 }
 
 export class CreateOrderDto {
@@ -54,6 +60,16 @@ export class CreateOrderDto {
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemDto)
   items: CreateOrderItemDto[];
+
+  @IsOptional()
+  @IsBoolean()
+  referralBonusApplied?: boolean;
+
+  /** Original price of the bonus service before it was zeroed out */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  referralBonusValue?: number;
 }
 
 export class UpdateOrderDto {
@@ -96,8 +112,12 @@ export class OrdersService {
   async findAll(filters?: {
     customerId?: string;
     status?: OrderStatus;
+    referralBonusApplied?: boolean;
   }): Promise<Order[]> {
-    this.logger.debug({ customerId: filters?.customerId, status: filters?.status }, 'orders:findAll');
+    this.logger.debug(
+      { customerId: filters?.customerId, status: filters?.status, referralBonusApplied: filters?.referralBonusApplied },
+      'orders:findAll',
+    );
     const query = this.ordersRepo
       .createQueryBuilder('order')
       .leftJoinAndSelect('order.customer', 'customer')
@@ -110,6 +130,9 @@ export class OrdersService {
     }
     if (filters?.status) {
       query.andWhere('order.status = :status', { status: filters.status });
+    }
+    if (filters?.referralBonusApplied !== undefined) {
+      query.andWhere('order.referralBonusApplied = :rba', { rba: filters.referralBonusApplied });
     }
 
     const results = await query.getMany();
@@ -153,6 +176,8 @@ export class OrdersService {
       scheduledDate: dto.scheduledDate ? new Date(dto.scheduledDate) : undefined,
       totalAmount: pricing.totalAmount,
       discountAmount: pricing.discountAmount,
+      referralBonusApplied: dto.referralBonusApplied ?? false,
+      referralBonusValue: dto.referralBonusValue ?? null,
     });
 
     order.items = resolvedItems.map((ri) =>
@@ -284,6 +309,23 @@ export class OrdersService {
     return stats;
   }
 
+  async getReferralBonusStats() {
+    this.logger.debug('orders:getReferralBonusStats');
+    const result = await this.ordersRepo
+      .createQueryBuilder('o')
+      .select('COUNT(*)', 'totalOrders')
+      .addSelect('COALESCE(SUM(CAST(o.referralBonusValue AS numeric)), 0)', 'totalBonusValue')
+      .addSelect('COALESCE(SUM(CAST(o.totalAmount AS numeric)), 0)', 'totalOrderRevenue')
+      .where('o.referralBonusApplied = true')
+      .getRawOne();
+
+    return {
+      totalOrders: parseInt(result.totalOrders, 10),
+      totalBonusValue: parseFloat(result.totalBonusValue),
+      totalOrderRevenue: parseFloat(result.totalOrderRevenue),
+    };
+  }
+
   // ---- Private helpers ---------------------------------------------------
 
   private async resolveItems(dtos: CreateOrderItemDto[]) {
@@ -312,7 +354,7 @@ export class OrdersService {
           type: OrderItemType.SERVICE,
           referenceId: service.id,
           name: service.name,
-          unitPrice: Number(service.basePrice),
+          unitPrice: dto.unitPriceOverride !== undefined ? dto.unitPriceOverride : Number(service.basePrice),
           quantity: dto.quantity,
           itemStatus: this.workflowService.getInitialStep(service.workflowDefinition),
         });

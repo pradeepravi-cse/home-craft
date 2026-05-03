@@ -52,6 +52,14 @@ export class Order {
   @Column({ nullable: true })
   completedDate: Date;
 
+  /** True when a referral bonus was applied to at least one item in this order */
+  @Column({ default: false })
+  referralBonusApplied: boolean;
+
+  /** Face value of the service(s) given free via referral bonus (for analytics) */
+  @Column({ type: 'numeric', precision: 10, scale: 2, nullable: true })
+  referralBonusValue: number | null;
+
   @OneToMany(() => OrderItem, (item) => item.order, { cascade: true })
   items: OrderItem[];
 
