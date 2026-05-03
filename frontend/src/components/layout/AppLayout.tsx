@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, ShoppingBag, TrendingUp,
-  Scissors, LogOut, Menu, X, FlaskConical, Sun, Moon, KeyRound, UserCog,
+  Scissors, LogOut, Menu, X, FlaskConical, Sun, Moon, KeyRound, UserCog, Gift,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuthStore } from '../../store/auth'
@@ -15,6 +15,7 @@ const navItems = [
   { path: '/services', icon: Scissors, label: 'Services' },
   { path: '/recipes', icon: FlaskConical, label: 'Recipes' },
   { path: '/earnings', icon: TrendingUp, label: 'Earnings' },
+  { path: '/referral-program', icon: Gift, label: 'Referral' },
   { path: '/users', icon: UserCog, label: 'Team' },
 ]
 

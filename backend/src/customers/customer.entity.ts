@@ -56,13 +56,9 @@ export class Customer {
   @Column({ default: false })
   isPrivileged: boolean;
 
-  /** True when this customer has a referral benefit (e.g. free pleating) not yet used */
-  @Column({ default: false })
-  referralBenefitPending: boolean;
-
-  /** Timestamp when the referral benefit was consumed */
-  @Column({ type: 'timestamptz', nullable: true })
-  referralBenefitUsedAt: Date | null;
+  /** How many referral bonus credits this customer (as referrer) has already redeemed */
+  @Column({ type: 'int', default: 0 })
+  referralBonusUsed: number;
 
   @OneToMany(() => Order, (order) => order.customer)
   orders: Order[];

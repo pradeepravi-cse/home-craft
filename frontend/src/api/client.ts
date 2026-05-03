@@ -55,7 +55,19 @@ export const customersApi = {
   create: (data: any) => api.post('/customers', data).then(r => r.data),
   update: (id: string, data: any) => api.patch(`/customers/${id}`, data).then(r => r.data),
   delete: (id: string) => api.delete(`/customers/${id}`).then(r => r.data),
-  referralStats: (id: string) => api.get(`/customers/${id}/referral-stats`).then(r => r.data),
+  referralStats: (id: string, referralsRequired?: number) =>
+    api.get(`/customers/${id}/referral-stats`, { params: { referralsRequired } }).then(r => r.data),
+  redeemReferralBonus: (id: string) =>
+    api.post(`/customers/${id}/redeem-referral-bonus`).then(r => r.data),
+}
+
+// Referral Bonus Configs
+export const referralBonusApi = {
+  list: () => api.get('/referral-bonus-configs').then(r => r.data),
+  active: () => api.get('/referral-bonus-configs/active').then(r => r.data),
+  create: (data: any) => api.post('/referral-bonus-configs', data).then(r => r.data),
+  update: (id: string, data: any) => api.patch(`/referral-bonus-configs/${id}`, data).then(r => r.data),
+  delete: (id: string) => api.delete(`/referral-bonus-configs/${id}`).then(r => r.data),
 }
 
 // Measurements
@@ -77,12 +89,14 @@ export const servicesApi = {
 
 // Orders
 export const ordersApi = {
-  list: (params?: { customerId?: string; status?: string }) => api.get('/orders', { params }).then(r => r.data),
+  list: (params?: { customerId?: string; status?: string; referralBonusApplied?: boolean }) =>
+    api.get('/orders', { params }).then(r => r.data),
   get: (id: string) => api.get(`/orders/${id}`).then(r => r.data),
   create: (data: any) => api.post('/orders', data).then(r => r.data),
   update: (id: string, data: any) => api.patch(`/orders/${id}`, data).then(r => r.data),
   delete: (id: string) => api.delete(`/orders/${id}`).then(r => r.data),
   stats: () => api.get('/orders/stats').then(r => r.data),
+  referralBonusStats: () => api.get('/orders/referral-bonus-stats').then(r => r.data),
   getWorkflow: (id: string) => api.get(`/orders/${id}/workflow`).then(r => r.data),
   updateItemStatus: (orderId: string, itemId: string, targetStep: string) =>
     api.patch(`/orders/${orderId}/items/${itemId}/status`, { targetStep }).then(r => r.data),

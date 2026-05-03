@@ -12,6 +12,7 @@ import ChangePasswordPage from './pages/ChangePassword'
 import Dashboard from './pages/Dashboard'
 import { CustomersPage, CustomerFormPage, CustomerDetailPage } from './pages/Customers'
 import Customer360Page from './pages/Customer360'
+import ReferralProgramPage from './pages/ReferralProgram'
 import { OrdersPage, NewOrderPage, OrderDetailPage } from './pages/Orders'
 import EarningsPage from './pages/Earnings'
 import ServicesPage from './pages/Services'
@@ -72,6 +73,7 @@ export default function App() {
 
         {/* Other */}
         <Route path="/earnings" element={<RequireAuth><EarningsPage /></RequireAuth>} />
+        <Route path="/referral-program" element={<RequireAuth><ReferralProgramPage /></RequireAuth>} />
         <Route path="/users" element={<RequireAuth><UsersPage /></RequireAuth>} />
         <Route path="/change-password" element={<RequireAuth><ChangePasswordPage /></RequireAuth>} />
 
