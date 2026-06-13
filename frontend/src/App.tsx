@@ -18,6 +18,7 @@ import EarningsPage from './pages/Earnings'
 import ServicesPage from './pages/Services'
 import RecipesPage from './pages/Recipes'
 import UsersPage from './pages/Users'
+import StatusPage from './pages/Status'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { token } = useAuthStore()
@@ -76,6 +77,7 @@ export default function App() {
         <Route path="/referral-program" element={<RequireAuth><ReferralProgramPage /></RequireAuth>} />
         <Route path="/users" element={<RequireAuth><UsersPage /></RequireAuth>} />
         <Route path="/change-password" element={<RequireAuth><ChangePasswordPage /></RequireAuth>} />
+        <Route path="/status" element={<RequireAuth><StatusPage /></RequireAuth>} />
 
         {/* Legacy redirects */}
         <Route path="/clients" element={<Navigate to="/customers" replace />} />

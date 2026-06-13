@@ -29,6 +29,7 @@ import { ServiceRecipesModule } from './service-recipes/service-recipes.module';
 import { BusinessSettingsModule } from './business-settings/business-settings.module';
 import { InvestmentsModule } from './investments/investments.module';
 import { ReferralBonusConfigModule } from './referral-bonus/referral-bonus-config.module';
+import { StatusModule } from './status/status.module';
 
 import { AuditLogModule } from './audit/audit-log.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -154,6 +155,7 @@ const IS_PROD = process.env.NODE_ENV === 'production';
     BusinessSettingsModule,
     InvestmentsModule,
     ReferralBonusConfigModule,
+    StatusModule,
   ],
   providers: [
     // Rate limiting enforced on every endpoint globally

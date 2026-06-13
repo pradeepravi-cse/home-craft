@@ -136,3 +136,16 @@ export const earningsApi = {
 export const dashboardApi = {
   get: () => api.get('/dashboard').then(r => r.data),
 }
+
+export interface AppStatus {
+  status: 'ok' | 'degraded'
+  version: string
+  environment: string
+  uptimeSeconds: number
+  timestamp: string
+  database: 'up' | 'down'
+}
+
+export const statusApi = {
+  get: () => api.get<AppStatus>('/public/status').then(r => r.data),
+}

@@ -1,4 +1,7 @@
 {
   "name": "homecraft",
-  "private": true
+  "private": true,
+  "scripts": {
+    "setup:hooks": "git config core.hooksPath .githooks"
+  }
 }

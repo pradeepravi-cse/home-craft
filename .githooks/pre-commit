@@ -1,0 +1,38 @@
+#!/usr/bin/env sh
+# Auto-bump the patch version of any package whose files are staged.
+#
+# Activate once per clone:
+#   git config core.hooksPath .githooks
+# (or: pnpm run setup:hooks from the repo root)
+set -e
+
+bump_if_affected() {
+  dir="$1"
+  pkg="$dir/package.json"
+
+  # nothing staged under this package → nothing to do
+  if git diff --cached --quiet -- "$dir"; then
+    return 0
+  fi
+
+  # version already changed manually in this commit → respect it, don't double-bump
+  if git diff --cached -- "$pkg" | grep -q '^[+-][[:space:]]*"version"'; then
+    return 0
+  fi
+
+  node -e '
+    const fs = require("fs");
+    const file = process.argv[1];
+    const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
+    const m = pkg.version.match(/^(\d+)\.(\d+)\.(\d+)/);
+    if (!m) { console.error(`pre-commit: cannot parse version "${pkg.version}" in ${file}`); process.exit(1); }
+    pkg.version = `${m[1]}.${m[2]}.${Number(m[3]) + 1}`;
+    fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
+    console.log(`pre-commit: ${file} -> ${pkg.version}`);
+  ' "$pkg"
+
+  git add "$pkg"
+}
+
+bump_if_affected backend
+bump_if_affected frontend

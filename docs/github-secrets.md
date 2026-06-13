@@ -4,6 +4,19 @@ Go to: **GitHub repo → Settings → Secrets and variables → Actions → New 
 
 ---
 
+## Docker Hub (image publishing — `.github/workflows/docker-publish.yml`)
+
+| Secret | Description | Where to get it |
+|---|---|---|
+| `DOCKERHUB_USERNAME` | Docker Hub username | `pradeepravi` |
+| `DOCKERHUB_TOKEN` | Docker Hub access token with Read & Write scope | Docker Hub → **Account Settings → Security → New Access Token** — never use your account password |
+
+Only the API image (`pradeepravi/homecraft-api`) is published — the frontend is hosted on Cloudflare Pages, which builds from the repo directly.
+
+Not a GitHub secret, but related: `TUNNEL_TOKEN` (Cloudflare Tunnel token) lives in the deployment host's `.env`, consumed by the `cloudflared` service in `docker-compose.prod.yml`. The tunnel's public hostname routes to `http://backend:3000`. Get the token from Cloudflare Dashboard → **Zero Trust → Networks → Tunnels → your tunnel → token**.
+
+---
+
 ## Cloudflare (frontend deploy)
 
 | Secret | Description | Where to get it |
@@ -45,6 +58,8 @@ Note: `CLOUDFLARE_ACCOUNT_ID` is shared — already listed under Cloudflare abov
 
 ## Full secrets checklist
 
+- [ ] `DOCKERHUB_USERNAME`
+- [ ] `DOCKERHUB_TOKEN`
 - [ ] `CLOUDFLARE_API_TOKEN`
 - [ ] `CLOUDFLARE_ACCOUNT_ID`
 - [ ] `CLOUDFLARE_PAGES_PROJECT_NAME`

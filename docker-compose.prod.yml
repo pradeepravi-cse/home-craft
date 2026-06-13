@@ -1,20 +1,30 @@
 version: '3.8'
 
 # ─────────────────────────────────────────────────────────────────
-#  Preethys' Business — Production deployment (Synology NAS)
+#  Preethys' Business — Production deployment (Synology NAS, ~4GB RAM)
+#
+#  Runs ONLY: postgres + backend API + cloudflared.
+#  The frontend is hosted on Cloudflare Pages — it is NOT part of
+#  this stack. The Pages app calls the API via the tunnel hostname
+#  (set VITE_API_URL in the Pages build to that URL).
+#
+#  Cloudflare Tunnel public hostname → http://backend:3000
+#
+#  Images are pulled from Docker Hub (built by GitHub Actions:
+#  .github/workflows/docker-publish.yml). No local builds in prod.
 #
 #  Prerequisites on the NAS (run once via SSH):
 #    mkdir -p /volume1/docker/homecraft/postgres
 #    chmod 700 /volume1/docker/homecraft/postgres
 #
-#  Deploy:
-#    docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+#  Deploy / update to newest images:
+#    docker compose -f docker-compose.prod.yml --env-file .env pull
+#    docker compose -f docker-compose.prod.yml --env-file .env up -d --remove-orphans
 #
-#  Update (rebuild images):
-#    docker compose -f docker-compose.prod.yml --env-file .env up -d --build --remove-orphans
+#  Pin a version: set IMAGE_TAG=1.2.3 in .env (defaults to latest)
 #
-#  Logs:
-#    docker compose -f docker-compose.prod.yml logs -f
+#  Memory budget (limits): postgres 512M + api 512M + cloudflared
+#  128M = ~1.2G of 4G — plenty of headroom for DSM.
 # ─────────────────────────────────────────────────────────────────
 
 services:
@@ -40,6 +50,13 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          memory: 256M
     logging:
       driver: "json-file"
       options:
@@ -48,15 +65,15 @@ services:
 
   # ── Backend API ───────────────────────────────────────────────
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    image: homecraft-backend:latest
+    image: pradeepravi/homecraft-api:${IMAGE_TAG:-latest}
     container_name: homecraft-api
     restart: always
     environment:
       NODE_ENV: production
       PORT: 3000
+      # Cap V8 heap below the container limit so Node degrades
+      # gracefully instead of being OOM-killed by the kernel
+      NODE_OPTIONS: --max-old-space-size=384
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/homecraft
       DB_SCHEMA: ${DB_SCHEMA:-public}
       JWT_SECRET: ${JWT_SECRET}
@@ -66,6 +83,9 @@ services:
       ADMIN_NAME: ${ADMIN_NAME:-Admin}
       APP_NAME: ${APP_NAME:-HomeCraft}
       APP_URL: ${APP_URL}
+      # CORS allow-list — must include the Cloudflare Pages origin(s),
+      # comma-separated (e.g. https://homecraft.pages.dev)
+      FRONTEND_URL: ${FRONTEND_URL}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}
@@ -77,60 +97,55 @@ services:
         condition: service_healthy
     networks:
       - app-network
-    # Not exposed to host — Nginx proxies to it internally
+    # Not exposed to host — cloudflared reaches it on the compose network
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health 2>/dev/null | grep -q ok || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          memory: 256M
     logging:
       driver: "json-file"
       options:
         max-size: "20m"
         max-file: "5"
 
-  # ── Frontend (nginx serving React SPA) ───────────────────────
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: /api
-        VITE_APP_NAME: ${APP_NAME:-HomeCraft}
-        VITE_APP_TAGLINE: ${VITE_APP_TAGLINE:-Business Manager}
-    image: homecraft-frontend:latest
-    container_name: homecraft-frontend
+  # ── Cloudflare Tunnel (exposes the API) ───────────────────────
+  # Token-based, remotely managed tunnel. Create it in the
+  # Cloudflare dashboard (Zero Trust → Networks → Tunnels), point
+  # the public hostname at http://backend:3000, and put the token
+  # in .env as TUNNEL_TOKEN. No ports are exposed on the host.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: homecraft-tunnel
     restart: always
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      backend:
+        condition: service_healthy
     networks:
       - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          memory: 32M
     logging:
       driver: "json-file"
       options:
         max-size: "5m"
         max-file: "2"
-
-  # ── Reverse Proxy ─────────────────────────────────────────────
-  nginx:
-    image: nginx:alpine
-    container_name: homecraft-nginx
-    restart: always
-    ports:
-      - "${APP_PORT:-8080}:80"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      backend:
-        condition: service_healthy
-      frontend:
-        condition: service_started
-    networks:
-      - app-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
 networks:
   app-network:
