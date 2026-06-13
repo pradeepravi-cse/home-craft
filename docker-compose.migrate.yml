@@ -1,0 +1,33 @@
+# ─────────────────────────────────────────────────────────────────
+#  One-shot Supabase → local postgres migration
+#
+#  Prerequisites in .env (never commit these):
+#    SUPABASE_DIRECT_URL=postgresql://postgres:<pass>@db.<project>.supabase.co:5432/postgres
+#    DB_USER and DB_PASSWORD (same values used by docker-compose.prod.yml)
+#
+#  Run once on the NAS:
+#    mkdir -p ./backup
+#    docker compose -f docker-compose.prod.yml -f docker-compose.migrate.yml \
+#      run --rm db-migrate
+#
+#  The dump is saved to ./backup/supabase-dump.sql on the host so you
+#  can re-run or inspect it without hitting Supabase again.
+# ─────────────────────────────────────────────────────────────────
+
+services:
+  db-migrate:
+    image: postgres:16-alpine
+    container_name: homecraft-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SUPABASE_DIRECT_URL: ${SUPABASE_DIRECT_URL}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./scripts/migrate-from-supabase.sh:/migrate.sh:ro
+      - ./backup:/backup
+    command: ["sh", "/migrate.sh"]
+    networks:
+      - app-network
