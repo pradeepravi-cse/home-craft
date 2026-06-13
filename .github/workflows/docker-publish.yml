@@ -14,7 +14,6 @@ name: Build & Push API Image
 on:
   push:
     branches: [main]
-    tags: ['v*.*.*']
     paths:
       - 'backend/**'
       - '.github/workflows/docker-publish.yml'
